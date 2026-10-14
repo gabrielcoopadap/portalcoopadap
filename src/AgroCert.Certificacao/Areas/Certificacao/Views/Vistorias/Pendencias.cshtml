@@ -1,0 +1,58 @@
+@model List<ApontamentoDto>
+@{
+    ViewData["Title"] = "Pendências de Vistoria";
+    ViewData["MenuAtivo"] = "cert-vistorias";
+}
+<div class="cert-modulo">
+    <partial name="_Recursos" />
+    <a class="cm-voltar" href="/certificacao/vistorias">@Html.Icone("arrow_back") Vistorias</a>
+
+    <div class="cm-topo">
+        <div>
+            <h1 class="cm-titulo">@Html.Icone("pending_actions") Pendências de Verificação em Campo</h1>
+            <p class="cm-subtitulo">Apontamentos em aberto de todas as vistorias, ordenados por prazo</p>
+        </div>
+    </div>
+
+    <div class="cm-card cm-tabela-wrap">
+        <div class="cm-tabela-scroll">
+            <table class="cm-tabela">
+                <thead><tr><th>Anomalia</th><th>Vistoria</th><th>Grau de risco</th><th>Prazo</th><th>Responsável</th></tr></thead>
+                <tbody>
+                    @if (Model.Count == 0)
+                    {
+                        <tr><td colspan="5" class="cm-tabela__vazio">Nenhuma pendência em aberto.</td></tr>
+                    }
+                    @foreach (var a in Model)
+                    {
+                        var dias = a.DiasRestantes;
+                        <tr class="is-clicavel" data-abrir-modal="modal-apont-@a.Id" tabindex="0">
+                            <td>
+                                <div class="cm-t-titulo">@a.Anomalia</div>
+                                @if (!string.IsNullOrWhiteSpace(a.Localizacao)) { <div class="cm-t-sub">@a.Localizacao</div> }
+                            </td>
+                            <td>@a.VistoriaCodigoDocumento — @a.VistoriaUnidade</td>
+                            <td>@Html.Pilula(Rotulos.RotuloGrauRisco(a.GrauRisco), Rotulos.EstiloGrauRisco(a.GrauRisco))</td>
+                            <td>
+                                <div class="@(dias < 0 ? "cm-t-vermelho" : "")">@Rotulos.Data(a.Prazo)</div>
+                                @if (dias.HasValue)
+                                {
+                                    <div class="cm-t-dias @(dias < 0 ? "cm-t-vermelho" : dias <= 7 ? "cm-t-ambar" : "")">
+                                        @(dias < 0 ? $"{Math.Abs(dias.Value)} dia(s) atrasado" : $"{dias} dia(s) restante(s)")
+                                    </div>
+                                }
+                            </td>
+                            <td>@(string.IsNullOrWhiteSpace(a.ResponsavelExecucao) ? "—" : a.ResponsavelExecucao)</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    @foreach (var a in Model)
+    {
+        <partial name="_ModalApontamento" model="a" />
+    }
+</div>
+<partial name="_Scripts" />

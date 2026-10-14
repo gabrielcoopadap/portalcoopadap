@@ -1,0 +1,83 @@
+@model ApontamentoDto
+@{
+    var a = Model;
+    var voltar = Context.Request.Path.ToString();
+}
+<dialog class="cm-modal" id="modal-apont-@a.Id" aria-labelledby="titulo-apont-@a.Id">
+    <div class="cm-modal__cab">
+        <h2 class="cm-modal__titulo" id="titulo-apont-@a.Id">@a.Anomalia</h2>
+        <button type="button" class="cm-icone-btn" data-fechar-modal aria-label="Fechar">@Html.Icone("close")</button>
+    </div>
+    <div class="cm-modal__corpo">
+        <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+            @Html.Pilula(Rotulos.RotuloGrauRisco(a.GrauRisco), Rotulos.EstiloGrauRisco(a.GrauRisco))
+            @Html.Pilula(a.Aberto ? "Em aberto" : "Encerrado", Rotulos.EstiloStatusApontamento(a.Status))
+            @if (a.RequisitoId.HasValue)
+            {
+                <span class="cm-tag cm-tag--verde">@(string.IsNullOrWhiteSpace(a.RequisitoCodigo) ? a.RequisitoTitulo : $"{a.RequisitoCodigo} — {a.RequisitoTitulo}")</span>
+            }
+        </div>
+
+        <div class="cm-detalhes" style="margin-top:16px">
+            <div><span class="cm-dl">Localização</span><span class="cm-dv">@(a.Localizacao ?? "—")</span></div>
+            <div><span class="cm-dl">Prazo</span><span class="cm-dv">@Rotulos.Data(a.Prazo)</span></div>
+            <div><span class="cm-dl">Responsável</span><span class="cm-dv">@(a.ResponsavelExecucao ?? "—")</span></div>
+            <div><span class="cm-dl">Vistoria</span><span class="cm-dv"><a href="/certificacao/vistorias/@a.VistoriaId">@a.VistoriaCodigoDocumento</a> — @a.VistoriaUnidade</span></div>
+        </div>
+
+        @if (!string.IsNullOrWhiteSpace(a.SituacaoEncontrada)) { <p class="cm-texto-rotulado"><b>Situação encontrada:</b> @a.SituacaoEncontrada</p> }
+        @if (!string.IsNullOrWhiteSpace(a.SituacaoRequerida)) { <p class="cm-texto-rotulado"><b>Situação requerida:</b> @a.SituacaoRequerida</p> }
+        @if (!string.IsNullOrWhiteSpace(a.RiscoAssociado)) { <p class="cm-texto-rotulado"><b>Risco associado:</b> @a.RiscoAssociado</p> }
+
+        @if (a.ImagemEncontradaUrl != null || a.ImagemRequeridaUrl != null)
+        {
+            <div class="cm-imagens">
+                @if (a.ImagemEncontradaUrl != null) { <figure><a href="@a.ImagemEncontradaUrl" target="_blank"><img src="@a.ImagemEncontradaUrl" alt="Situação encontrada" loading="lazy" /></a><figcaption>Situação encontrada</figcaption></figure> }
+                @if (a.ImagemRequeridaUrl != null) { <figure><a href="@a.ImagemRequeridaUrl" target="_blank"><img src="@a.ImagemRequeridaUrl" alt="Situação requerida" loading="lazy" /></a><figcaption>Situação requerida</figcaption></figure> }
+            </div>
+        }
+
+        @if (!a.Aberto)
+        {
+            <div class="cm-caixa">
+                <b>Encerrado em @Rotulos.Data(a.DataEncerramento)</b>
+                @if (!string.IsNullOrWhiteSpace(a.ObservacoesEncerramento)) { <div>@a.ObservacoesEncerramento</div> }
+                @if (a.ImagemEvidenciaEncerramentoUrl != null)
+                {
+                    <div class="cm-imagens"><figure><a href="@a.ImagemEvidenciaEncerramentoUrl" target="_blank"><img src="@a.ImagemEvidenciaEncerramentoUrl" alt="Evidência" loading="lazy" /></a><figcaption>Evidência</figcaption></figure></div>
+                }
+            </div>
+        }
+        else
+        {
+            <form id="form-encerrar-@a.Id" method="post" action="/certificacao/vistorias/apontamentos/@a.Id/encerrar" enctype="multipart/form-data" style="margin-top:16px">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="voltarPara" value="@voltar" />
+                <div class="cm-campo"><label for="obs-@a.Id">Observações do encerramento</label><textarea id="obs-@a.Id" class="cm-textarea" name="Observacoes" placeholder="O que foi feito para regularizar"></textarea></div>
+                <div class="cm-campo"><label for="evid-@a.Id">Foto — evidência da regularização</label><input id="evid-@a.Id" type="file" accept="image/*" class="cm-input" name="Evidencia" /></div>
+            </form>
+        }
+    </div>
+    <div class="cm-modal__acoes cm-modal__acoes--entre">
+        <form method="post" action="/certificacao/vistorias/apontamentos/@a.Id/excluir" data-confirmar="Excluir este apontamento?">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="voltarPara" value="@voltar" />
+            <button type="submit" class="cm-btn cm-btn--perigo">@Html.Icone("delete_outline") Excluir</button>
+        </form>
+        <div class="cm-acoes">
+            <button type="button" class="cm-btn cm-btn--contorno" data-fechar-modal>Fechar</button>
+            @if (a.Aberto)
+            {
+                <button type="submit" form="form-encerrar-@a.Id" class="cm-btn cm-btn--primario" data-carregando="Salvando...">@Html.Icone("task_alt") Encerrar pendência</button>
+            }
+            else
+            {
+                <form method="post" action="/certificacao/vistorias/apontamentos/@a.Id/reabrir">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="voltarPara" value="@voltar" />
+                    <button type="submit" class="cm-btn cm-btn--contorno">@Html.Icone("replay") Reabrir</button>
+                </form>
+            }
+        </div>
+    </div>
+</dialog>

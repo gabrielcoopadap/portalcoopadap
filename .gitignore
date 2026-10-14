@@ -1,0 +1,37 @@
+# .NET
+bin/
+obj/
+.vs/
+.idea/
+*.user
+*.suo
+
+# Bancos locais e arquivos enviados (dados reais — não versionar)
+*.db
+*.db-shm
+*.db-wal
+**/uploads/
+appsettings.*.local.json
+
+# Angular / Node
+node_modules/
+dist/
+.angular/
+
+# Segredos
+.env
+.env.*
+
+# Dados grandes ou sensíveis
+# - dados-corredores: CAR dos cooperados (LGPD) e rasters do MapBiomas (~3 GB)
+# - ucs: zip público do CNUC (60 MB) — baixar pelo link do LEIA-ME.txt
+dados-corredores/
+dados-ambiental/ucs/*.zip
+*.tif
+
+# api-clima é Node.js (NestJS) e tem repositório próprio
+src/api-clima/
+
+# Windows
+desktop.ini
+Thumbs.db

@@ -1,0 +1,23 @@
+@{
+    ViewData["Title"] = "Clima · API fora do ar";
+    var url = ViewData["ApiClima"] as string ?? "http://localhost:3030";
+}
+<div class="cert-modulo clima-modulo">
+    <partial name="_RecursosClima" />
+
+    <section class="cm-card cl-card cl-indisponivel">
+        <span class="cl-indisponivel__icone">@Html.Icone("cloud_off")</span>
+        <div>
+            <h2>A api-clima não está respondendo</h2>
+            <p>O portal tentou falar com <code>@url</code> e não conseguiu. Para testar no computador:</p>
+            <ol>
+                <li>Abra um terminal na pasta <code>src\api-clima</code>.</li>
+                <li>Na primeira vez: <code>npm install</code> e <code>npx prisma migrate deploy</code> (o arquivo <code>.env</code> precisa ter o <code>DATABASE_URL</code> do PostgreSQL).</li>
+                <li>Suba a API: <code>npm run start:dev</code> e espere aparecer que ela está ouvindo na porta 3030.</li>
+                <li>Volte aqui e atualize a página.</li>
+            </ol>
+            <p class="cm-ajuda">Se a API estiver em outro endereço, ajuste <code>Clima:ApiUrl</code> no <code>appsettings.json</code> do portal.</p>
+            <a class="cm-btn cm-btn--primario" href="">@Html.Icone("refresh") Tentar de novo</a>
+        </div>
+    </section>
+</div>

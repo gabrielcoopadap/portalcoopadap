@@ -1,0 +1,258 @@
+@model RequisitosViewModel
+@using System.Text.Json
+@{
+    ViewData["Title"] = "Requisitos";
+    ViewData["MenuAtivo"] = "cert-requisitos";
+    var voltar = Context.Request.Path + Context.Request.QueryString;
+    var filtrosAtivos = !string.IsNullOrEmpty(Model.Busca) || !string.IsNullOrEmpty(Model.Tema) || !string.IsNullOrEmpty(Model.Norma) || !string.IsNullOrEmpty(Model.Status) || !string.IsNullOrEmpty(Model.Prioridade);
+}
+<div class="cert-modulo">
+    <partial name="_Recursos" />
+
+    <div class="cm-topo">
+        <div>
+            <h1 class="cm-titulo">@Html.Icone("checklist") Requisitos</h1>
+            <p class="cm-subtitulo">Lista mestra consolidada — @Model.Conformes de @Model.Todos.Count conformes (@Model.Filtrados.Count exibidos)</p>
+        </div>
+        <div class="cm-acoes">
+            <div class="cm-dropdown">
+                <button type="button" class="cm-btn cm-btn--contorno" data-dropdown>@Html.Icone("download") Baixar lista mestra @Html.Icone("arrow_drop_down")</button>
+                <ul class="cm-dropdown__lista">
+                    <li><a href="/certificacao/requisitos/lista-mestra">Todas as certificações</a></li>
+                    @foreach (var n in Model.Normas)
+                    {
+                        <li><a href="/certificacao/requisitos/lista-mestra?certificacao=@Uri.EscapeDataString(n)">@n</a></li>
+                    }
+                </ul>
+            </div>
+            <div class="cm-dropdown">
+                <button type="button" class="cm-btn cm-btn--contorno" data-dropdown title="Abre o site oficial da norma para conferir se saiu versão nova">@Html.Icone("update") Verificar normas @Html.Icone("arrow_drop_down")</button>
+                <ul class="cm-dropdown__lista">
+                    @foreach (var n in Model.Normas.Where(n => Rotulos.SiteNorma.ContainsKey(n)))
+                    {
+                        var versoes = string.Join(", ", Model.Todos.SelectMany(r => r.Referencias).Where(x => x.Norma == n)
+                            .Select(x => x.Versao).Where(v => !string.IsNullOrWhiteSpace(v)).Distinct());
+                        <li><a href="@Rotulos.SiteNorma[n]" target="_blank" rel="noopener">@(versoes.Length > 0 ? $"{n} — em uso: {versoes}" : n)</a></li>
+                    }
+                </ul>
+            </div>
+            <button type="button" class="cm-btn cm-btn--primario" data-abrir-modal="modal-requisito" data-novo>@Html.Icone("add") Novo Requisito</button>
+        </div>
+    </div>
+
+    <form class="cm-card cm-filtros" method="get" action="/certificacao/requisitos">
+        <div class="cm-filtros__topo">
+            <span class="cm-filtros__rotulo">Filtros</span>
+            <button type="button" class="cm-filtros__alternar" data-alternar-filtros>@Html.Icone("expand_less")<span class="rot">Esconder filtros</span></button>
+        </div>
+        <div class="cm-filtros__corpo">
+            <div class="cm-campo" style="grid-column: span 2">
+                <label for="f-busca">Buscar</label>
+                <div class="cm-busca">@Html.Icone("search")<input id="f-busca" class="cm-input" name="busca" value="@Model.Busca" placeholder="Requisito, descrição ou código da norma..." /></div>
+            </div>
+            <div class="cm-campo">
+                <label for="f-tema">Tema</label>
+                <select id="f-tema" class="cm-select" name="tema">
+                    <option value="">Todos os temas</option>
+                    @foreach (var t in Model.Temas) { <option selected="@(t == Model.Tema)">@t</option> }
+                </select>
+            </div>
+            <div class="cm-campo">
+                <label for="f-norma">Certificação</label>
+                <select id="f-norma" class="cm-select" name="norma">
+                    <option value="">Todas as certificações</option>
+                    @foreach (var n in Model.Normas) { <option selected="@(n == Model.Norma)">@n</option> }
+                </select>
+            </div>
+            <div class="cm-campo">
+                <label for="f-status">Status</label>
+                <select id="f-status" class="cm-select" name="status">
+                    <option value="">Todos os status</option>
+                    @foreach (var s in Rotulos.StatusRequisito) { <option selected="@(s == Model.Status)">@s</option> }
+                </select>
+            </div>
+            <div class="cm-campo">
+                <label for="f-prioridade">Prioridade</label>
+                <select id="f-prioridade" class="cm-select" name="prioridade">
+                    <option value="">Todas as prioridades</option>
+                    @foreach (var p in Rotulos.Prioridades) { <option selected="@(p == Model.Prioridade)">@p</option> }
+                </select>
+            </div>
+            <div class="cm-filtros__botoes">
+                @if (filtrosAtivos)
+                {
+                    <a class="cm-btn cm-btn--contorno" href="/certificacao/requisitos">Limpar</a>
+                }
+                <button type="submit" class="cm-btn cm-btn--primario">@Html.Icone("filter_alt") Filtrar</button>
+            </div>
+        </div>
+    </form>
+
+    <div class="cm-card cm-tabela-wrap">
+        <div class="cm-tabela-scroll">
+            <table class="cm-tabela">
+                <thead>
+                    <tr><th>Requisito</th><th>Tema</th><th>Referências (normas)</th><th>Prioridade</th><th>Status</th><th style="width:96px"></th></tr>
+                </thead>
+                <tbody>
+                    @if (Model.Filtrados.Count == 0)
+                    {
+                        <tr><td colspan="6" class="cm-tabela__vazio">Nenhum requisito encontrado.</td></tr>
+                    }
+                    @foreach (var r in Model.Filtrados)
+                    {
+                        var dados = JsonSerializer.Serialize(new
+                        {
+                            __acao = $"/certificacao/requisitos/{r.Id}",
+                            r.Titulo, r.Descricao, r.Tema, r.Prioridade, r.Status, r.Responsavel, r.Periodicidade,
+                            Prazo = r.Prazo?.ToString("yyyy-MM-dd"),
+                            r.Observacao,
+                            Referencias = r.Referencias.Select(x => new { x.Norma, x.Versao, x.Codigo }),
+                        });
+                        var obs = r.Observacao ?? "";
+                        <tr class="is-clicavel" data-editar="@dados" data-modal="modal-requisito" tabindex="0">
+                            <td>
+                                <div class="cm-t-titulo">@r.Titulo</div>
+                                @if (obs.Length > 0)
+                                {
+                                    <div class="cm-t-sub">@(obs.Length > 90 ? obs[..90] + "…" : obs)</div>
+                                }
+                            </td>
+                            <td>@r.Tema</td>
+                            <td>
+                                @foreach (var x in r.Referencias)
+                                {
+                                    <span class="cm-tag" title="@x.Norma @x.Versao">@Rotulos.Sigla(x.Norma) @x.Codigo</span>
+                                }
+                            </td>
+                            <td>@Html.Pilula(r.Prioridade?.ToUpperInvariant(), Rotulos.EstiloPrioridade(r.Prioridade))</td>
+                            <td>@Html.Pilula(r.Status, Rotulos.EstiloStatusRequisito(r.Status))</td>
+                            <td class="cm-req-acoes">
+                                @if (r.TemGuia)
+                                {
+                                    <button type="button" class="cm-icone-btn cm-icone-btn--guia" data-guia="@r.Id" title="Como cumprir este requisito" aria-label="Como cumprir: @r.Titulo">@Html.Icone("menu_book")</button>
+                                    <template id="guia-@r.Id">
+                                        <div class="cm-guia__topo">
+                                            @Html.Pilula(r.Prioridade?.ToUpperInvariant(), Rotulos.EstiloPrioridade(r.Prioridade))
+                                            @foreach (var x in r.Referencias) { <span class="cm-tag" title="@x.Norma @x.Versao">@Rotulos.Sigla(x.Norma) @x.Codigo</span> }
+                                        </div>
+                                        <h3 class="cm-guia__titulo">@r.Titulo</h3>
+                                        @if (!string.IsNullOrWhiteSpace(r.OQueE)) { <section class="cm-guia__bloco"><h4>@Html.Icone("help_outline") O que é</h4><p>@r.OQueE</p></section> }
+                                        @{ var passos = Requisito.Linhas(r.PassoAPasso); }
+                                        @if (passos.Count > 0) { <section class="cm-guia__bloco"><h4>@Html.Icone("format_list_numbered") Passo a passo</h4><ol>@foreach (var x in passos) { <li>@x</li> }</ol></section> }
+                                        @{ var evid = Requisito.Linhas(r.Evidencias); }
+                                        @if (evid.Count > 0) { <section class="cm-guia__bloco"><h4>@Html.Icone("folder_open") O que o auditor vai pedir</h4><ul class="cm-guia__check">@foreach (var x in evid) { <li>@x</li> }</ul></section> }
+                                        @{ var auto = Requisito.Linhas(r.Autoverificacao); }
+                                        @if (auto.Count > 0) { <section class="cm-guia__bloco"><h4>@Html.Icone("fact_check") Confira se está pronto</h4><ul class="cm-guia__perguntas">@foreach (var x in auto) { <li>@x</li> }</ul></section> }
+                                        @{ var erros = Requisito.Linhas(r.ErrosComuns); }
+                                        @if (erros.Count > 0) { <section class="cm-guia__bloco cm-guia__bloco--alerta"><h4>@Html.Icone("warning_amber") Erros comuns</h4><ul>@foreach (var x in erros) { <li>@x</li> }</ul></section> }
+                                        @{ var ajuda = Requisito.Linhas(r.OndeBuscarAjuda); }
+                                        @if (ajuda.Count > 0) { <section class="cm-guia__bloco"><h4>@Html.Icone("support_agent") Onde buscar ajuda</h4><ul>@foreach (var x in ajuda) { <li>@x</li> }</ul></section> }
+                                        @if (!string.IsNullOrWhiteSpace(r.Observacao)) { <section class="cm-guia__bloco"><h4>@Html.Icone("assignment") O que apresentar</h4><p>@r.Observacao</p></section> }
+                                    </template>
+                                }
+                                <form method="post" action="/certificacao/requisitos/@r.Id/excluir" data-confirmar="Excluir este requisito?">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="voltarPara" value="@voltar" />
+                                    <button type="submit" class="cm-icone-btn" title="Excluir">@Html.Icone("delete_outline")</button>
+                                </form>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <dialog class="cm-modal cm-modal--guia" id="modal-guia" aria-labelledby="titulo-modal-guia">
+        <div class="cm-modal__cab">
+            <h2 class="cm-modal__titulo" id="titulo-modal-guia">@Html.Icone("menu_book") Como cumprir</h2>
+            <div class="cm-acoes">
+                <button type="button" class="cm-btn cm-btn--contorno cm-btn--pequeno" data-imprimir-guia>@Html.Icone("print") Imprimir</button>
+                <button type="button" class="cm-icone-btn" data-fechar-modal aria-label="Fechar">@Html.Icone("close")</button>
+            </div>
+        </div>
+        <div class="cm-modal__corpo cm-guia" id="corpo-guia"></div>
+    </dialog>
+
+    <dialog class="cm-modal" id="modal-requisito" aria-labelledby="titulo-modal-req">
+        <form method="post" action="/certificacao/requisitos" data-acao-nova="/certificacao/requisitos">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="voltarPara" value="@voltar" />
+            <div class="cm-modal__cab">
+                <h2 class="cm-modal__titulo" id="titulo-modal-req" data-titulo-novo="Novo Requisito" data-titulo-edicao="Editar Requisito">Novo Requisito</h2>
+                <button type="button" class="cm-icone-btn" data-fechar-modal aria-label="Fechar">@Html.Icone("close")</button>
+            </div>
+            <div class="cm-modal__corpo">
+                <div class="cm-campo"><label for="r-titulo">Título *</label><input id="r-titulo" class="cm-input" name="Titulo" required /></div>
+                <div class="cm-campo"><label for="r-desc">Descrição</label><textarea id="r-desc" class="cm-textarea" name="Descricao"></textarea></div>
+                <div class="cm-linha cm-linha--3">
+                    <div class="cm-campo"><label for="r-tema">Tema</label><input id="r-tema" class="cm-input" name="Tema" list="lista-temas" /></div>
+                    <div class="cm-campo"><label for="r-prio">Prioridade</label>
+                        <select id="r-prio" class="cm-select" name="Prioridade" data-padrao="Maior">
+                            @foreach (var p in Rotulos.Prioridades) { <option selected="@(p == "Maior")">@p</option> }
+                        </select>
+                    </div>
+                    <div class="cm-campo"><label for="r-status">Status</label>
+                        <select id="r-status" class="cm-select" name="Status" data-padrao="Pendente">
+                            @foreach (var s in Rotulos.StatusRequisito) { <option selected="@(s == "Pendente")">@s</option> }
+                        </select>
+                    </div>
+                </div>
+                <datalist id="lista-temas">@foreach (var t in Model.Temas) { <option value="@t"></option> }</datalist>
+
+                <span class="cm-rotulo">Referências às normas (de onde o requisito veio)</span>
+                <div class="cm-lista-edit" id="lista-referencias" data-lista="Referencias" data-template="tpl-referencia" style="margin-top:6px"></div>
+                <template id="tpl-referencia">
+                    <div class="cm-lista-edit__linha">
+                        <select class="cm-select" name="Referencias[__i__].Norma" data-campo="Norma" aria-label="Norma">
+                            @foreach (var n in Rotulos.Normas) { <option>@n</option> }
+                        </select>
+                        <input class="cm-input" name="Referencias[__i__].Versao" data-campo="Versao" placeholder="versão" aria-label="Versão" />
+                        <input class="cm-input" name="Referencias[__i__].Codigo" data-campo="Codigo" placeholder="código (ex: 4.6.13)" aria-label="Código" />
+                        <button type="button" class="cm-icone-btn" data-remover-linha title="Remover">@Html.Icone("close")</button>
+                    </div>
+                </template>
+                <button type="button" class="cm-btn cm-btn--texto cm-btn--pequeno" data-adicionar-linha="lista-referencias" data-template="tpl-referencia">@Html.Icone("add") Referência</button>
+
+                <div class="cm-campo" style="margin-top:14px"><label for="r-obs">O que apresentar (conformidade)</label><textarea id="r-obs" class="cm-textarea" name="Observacao"></textarea></div>
+                <div class="cm-linha cm-linha--3">
+                    <div class="cm-campo"><label for="r-resp">Responsável</label><input id="r-resp" class="cm-input" name="Responsavel" /></div>
+                    <div class="cm-campo"><label for="r-per">Periodicidade</label><input id="r-per" class="cm-input" name="Periodicidade" placeholder="Ex: Anual" /></div>
+                    <div class="cm-campo"><label for="r-prazo">Prazo</label><input id="r-prazo" type="date" class="cm-input" name="Prazo" /></div>
+                </div>
+            </div>
+            <div class="cm-modal__acoes">
+                <button type="button" class="cm-btn cm-btn--contorno" data-fechar-modal>Cancelar</button>
+                <button type="submit" class="cm-btn cm-btn--primario" data-carregando="Salvando...">Salvar</button>
+            </div>
+        </form>
+    </dialog>
+</div>
+<partial name="_Scripts" />
+<script>
+    (function () {
+        var dlg = document.getElementById("modal-guia"), corpo = document.getElementById("corpo-guia");
+        if (!dlg) return;
+        document.addEventListener("click", function (e) {
+            var b = e.target.closest("[data-guia]");
+            if (b) {
+                var t = document.getElementById("guia-" + b.getAttribute("data-guia"));
+                if (!t) return;
+                corpo.innerHTML = "";
+                corpo.appendChild(t.content.cloneNode(true));
+                dlg.showModal();
+                corpo.scrollTop = 0;
+                return;
+            }
+            if (e.target.closest("[data-imprimir-guia]")) {
+                var w = window.open("", "_blank");
+                if (!w) return;
+                w.document.write('<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>Como cumprir</title><style>body{font:12pt Roboto,Arial,sans-serif;color:#222;margin:18mm}h3{font-size:15pt;margin:8px 0}h4{font-size:12pt;color:#3e6e2a;margin:14px 0 4px}.material-icons{display:none}.cm-tag,.cm-pilula{display:inline-block;border:1px solid #ccc;border-radius:10px;padding:1px 8px;margin:0 4px 4px 0;font-size:9pt}li{margin:3px 0}<\/style><\/head><body>' + corpo.innerHTML + "<\/body><\/html>");
+                w.document.close();
+                w.focus();
+                w.print();
+            }
+        });
+    })();
+</script>

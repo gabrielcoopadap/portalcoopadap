@@ -1,0 +1,49 @@
+<ac-modal [aberto]="!!a" [titulo]="a?.anomalia ?? ''" (fechar)="fechar.emit()">
+  <ng-container *ngIf="a">
+    <div class="cm-modal__corpo">
+      <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+        <ac-pilula [texto]="rotuloGrauRisco(a.grauRisco)" [estilo]="estiloGrauRisco(a.grauRisco)"></ac-pilula>
+        <ac-pilula [texto]="a.aberto ? 'Em aberto' : 'Encerrado'" [estilo]="estiloStatusApontamento(a.status)"></ac-pilula>
+        <span *ngIf="a.requisitoId" class="cm-tag cm-tag--verde">{{ a.requisitoCodigo ? a.requisitoCodigo + ' — ' + a.requisitoTitulo : a.requisitoTitulo }}</span>
+      </div>
+
+      <div class="cm-detalhes" style="margin-top:16px">
+        <div><span class="cm-dl">Localização</span><span class="cm-dv">{{ a.localizacao ?? '—' }}</span></div>
+        <div><span class="cm-dl">Prazo</span><span class="cm-dv">{{ a.prazo | acData }}</span></div>
+        <div><span class="cm-dl">Responsável</span><span class="cm-dv">{{ a.responsavelExecucao ?? '—' }}</span></div>
+        <div><span class="cm-dl">Vistoria</span><span class="cm-dv"><a [routerLink]="['vistorias', a.vistoriaId] | acRota" (click)="fechar.emit()">{{ a.vistoriaCodigoDocumento }}</a> — {{ a.vistoriaUnidade }}</span></div>
+      </div>
+
+      <p *ngIf="temTexto(a.situacaoEncontrada)" class="cm-texto-rotulado"><b>Situação encontrada:</b> {{ a.situacaoEncontrada }}</p>
+      <p *ngIf="temTexto(a.situacaoRequerida)" class="cm-texto-rotulado"><b>Situação requerida:</b> {{ a.situacaoRequerida }}</p>
+      <p *ngIf="temTexto(a.riscoAssociado)" class="cm-texto-rotulado"><b>Risco associado:</b> {{ a.riscoAssociado }}</p>
+
+      <div *ngIf="a.imagemEncontradaUrl || a.imagemRequeridaUrl" class="cm-imagens">
+        <figure *ngIf="a.imagemEncontradaUrl"><a [href]="a.imagemEncontradaUrl | acArquivo" target="_blank" rel="noopener"><img [src]="a.imagemEncontradaUrl | acArquivo" alt="Situação encontrada" loading="lazy" /></a><figcaption>Situação encontrada</figcaption></figure>
+        <figure *ngIf="a.imagemRequeridaUrl"><a [href]="a.imagemRequeridaUrl | acArquivo" target="_blank" rel="noopener"><img [src]="a.imagemRequeridaUrl | acArquivo" alt="Situação requerida" loading="lazy" /></a><figcaption>Situação requerida</figcaption></figure>
+      </div>
+
+      <div *ngIf="!a.aberto" class="cm-caixa">
+        <b>Encerrado em {{ a.dataEncerramento | acData }}</b>
+        <div *ngIf="temTexto(a.observacoesEncerramento)">{{ a.observacoesEncerramento }}</div>
+        <div *ngIf="a.imagemEvidenciaEncerramentoUrl" class="cm-imagens"><figure><a [href]="a.imagemEvidenciaEncerramentoUrl | acArquivo" target="_blank" rel="noopener"><img [src]="a.imagemEvidenciaEncerramentoUrl | acArquivo" alt="Evidência" loading="lazy" /></a><figcaption>Evidência</figcaption></figure></div>
+      </div>
+
+      <form *ngIf="a.aberto" [id]="'form-encerrar-' + a.id" style="margin-top:16px" (ngSubmit)="encerrar()">
+        <div class="cm-campo"><label [for]="'obs-' + a.id">Observações do encerramento</label><textarea [id]="'obs-' + a.id" class="cm-textarea" name="Observacoes" [(ngModel)]="observacoes" placeholder="O que foi feito para regularizar"></textarea></div>
+        <div class="cm-campo"><label [for]="'evid-' + a.id">Foto — evidência da regularização</label><input #evidencia [id]="'evid-' + a.id" type="file" accept="image/*" class="cm-input" name="Evidencia" /></div>
+      </form>
+    </div>
+    <div class="cm-modal__acoes cm-modal__acoes--entre">
+      <button type="button" class="cm-btn cm-btn--perigo" [disabled]="salvando" (click)="excluir()"><span class="material-icons" aria-hidden="true">delete_outline</span> Excluir</button>
+      <div class="cm-acoes">
+        <button type="button" class="cm-btn cm-btn--contorno" (click)="fechar.emit()">Fechar</button>
+        <button *ngIf="a.aberto" type="submit" [attr.form]="'form-encerrar-' + a.id" class="cm-btn cm-btn--primario" [class.is-carregando]="salvando" [disabled]="salvando">
+          <ng-container *ngIf="!salvando"><span class="material-icons" aria-hidden="true">task_alt</span> Encerrar pendência</ng-container>
+          <ng-container *ngIf="salvando">Salvando...</ng-container>
+        </button>
+        <button *ngIf="!a.aberto" type="button" class="cm-btn cm-btn--contorno" [disabled]="salvando" (click)="reabrir()"><span class="material-icons" aria-hidden="true">replay</span> Reabrir</button>
+      </div>
+    </div>
+  </ng-container>
+</ac-modal>

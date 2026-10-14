@@ -1,0 +1,8 @@
+@{
+    var item = (ViewData["Item"] as string ?? "").Replace('-', ' ');
+    ViewData["Title"] = item;
+}
+<div class="pt-home">
+    <div class="pt-secao-titulo"><span class="material-icons">info</span><span style="text-transform:capitalize">@item</span></div>
+    <p class="pt-ajuda">Este item faz parte do Portal Coopadap e aparece aqui só para compor o menu. O ambiente de teste contém apenas o módulo <a href="/certificacao">Certificação</a>.</p>
+</div>

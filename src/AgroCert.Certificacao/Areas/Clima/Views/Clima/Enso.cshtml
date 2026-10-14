@@ -1,0 +1,200 @@
+@model EnsoTela?
+@{
+    ViewData["Title"] = "Clima · El Niño / La Niña";
+    var s = Model?.Situacao;
+    var imp = Model?.Impacto;
+
+    var pontos = new List<(int Ano, int Mes, double Oni, double Inc, bool Proj, string Desc)>();
+    if (s is not null)
+    {
+        foreach (var o in s.Ultimos12Meses.Where(o => o.Oni.HasValue))
+            pontos.Add((o.Ano, o.Mes, o.Oni!.Value, 0, false, $"{NomeFase(o.Fase)} (ONI {S(o.Oni.Value)})"));
+        foreach (var o in s.Proximos12Meses)
+            pontos.Add((o.Ano, o.Mes, o.Oni, o.Incerteza, true, o.Descricao));
+    }
+    const double W = 640, H = 250, mE = 40, mD = 12, mT = 18, mB = 34;
+    var n = Math.Max(pontos.Count, 1);
+    var larg = (W - mE - mD) / n;
+    double X(int i) => mE + larg * i + larg / 2;
+    var lim = pontos.Count == 0 ? 1 : pontos.Max(p => Math.Abs(p.Oni) + p.Inc);
+    var topo = Math.Max(1.0, Math.Ceiling(lim * 2) / 2);
+    double Y(double v) => mT + (H - mT - mB) * (topo - v) / (2 * topo);
+    var y0 = Y(0);
+    var primeiroProj = pontos.FindIndex(p => p.Proj);
+
+    string Barra(double x, double w, double v)
+    {
+        var y1 = Y(v);
+        var h = Math.Abs(y1 - y0);
+        if (h < 0.5) return "";
+        var r = Math.Min(3, Math.Min(w / 2, h));
+        return v >= 0
+            ? $"M{F(x)},{F(y0)} V{F(y1 + r)} Q{F(x)},{F(y1)} {F(x + r)},{F(y1)} H{F(x + w - r)} Q{F(x + w)},{F(y1)} {F(x + w)},{F(y1 + r)} V{F(y0)} Z"
+            : $"M{F(x)},{F(y0)} V{F(y1 - r)} Q{F(x)},{F(y1)} {F(x + r)},{F(y1)} H{F(x + w - r)} Q{F(x + w)},{F(y1)} {F(x + w)},{F(y1 - r)} V{F(y0)} Z";
+    }
+
+    var linhas = imp?.Linhas ?? new List<ImpactoLinhaDto>();
+    ImpactoLinhaDto? L(int mes, string v) => linhas.FirstOrDefault(l => l.Mes == mes && l.Variavel == v);
+    var colunas = new (string Var, bool Nino, string Titulo)[]
+    {
+        ("chuva", true, "El Niño"), ("chuva", false, "La Niña"),
+        ("maxima", true, "El Niño"), ("maxima", false, "La Niña"),
+        ("minima", true, "El Niño"), ("minima", false, "La Niña"),
+    };
+}
+<div class="cert-modulo clima-modulo">
+    <partial name="_RecursosClima" />
+
+    @if (s is not null && imp is not null)
+    {
+        <div class="cl-duas cl-duas--enso">
+            <section class="cm-card cl-card cl-situacao">
+                <div class="cl-card__cab"><h2>Situação atual</h2><span class="cm-contador">@NomeMes(s.UltimoMes.Mes)/@s.UltimoMes.Ano</span></div>
+                <div class="cl-situacao__topo">
+                    <div class="cl-situacao__oni">
+                        <span class="cl-situacao__rot">ONI</span>
+                        <span class="cl-situacao__valor">@S(s.Oni)</span>
+                    </div>
+                    <div>
+                        <span class="cl-fase cl-fase--grande @ClasseFase(s.Fase)">@NomeFase(s.Fase)@(s.Fase == "NEUTRO" ? "" : " " + s.Intensidade.ToLowerInvariant())</span>
+                        <div class="cl-situacao__linha">@Html.Icone(s.Episodio != "NEUTRO" ? "check_circle" : "schedule")
+                            @(s.Episodio != "NEUTRO" ? $"Episódio de {NomeFase(s.Episodio)} configurado" : s.Fase != "NEUTRO" ? "Em formação — ainda sem 5 trimestres seguidos" : "Sem episódio em curso")
+                        </div>
+                        <div class="cl-situacao__linha">@Html.Icone(s.Tendencia3Meses >= 0 ? "trending_up" : "trending_down")
+                            @S(s.Tendencia3Meses) em 3 meses (@(s.Tendencia3Meses >= 0.3 ? "aquecendo" : s.Tendencia3Meses <= -0.3 ? "esfriando" : "estável"))
+                        </div>
+                    </div>
+                </div>
+                <p class="cl-resumo cl-resumo--card">@s.Resumo</p>
+                @if (!string.IsNullOrEmpty(s.Observacao))
+                {
+                    <p class="cm-ajuda">@s.Observacao</p>
+                }
+            </section>
+
+            <section class="cm-card cl-card">
+                <div class="cl-card__cab"><h2>ONI: últimos 12 meses e projeção</h2><span class="cm-contador">índice do Pacífico (NOAA)</span></div>
+                <div class="ff-legenda cl-legenda">
+                    <span><i style="background:#e34948"></i>Acima de zero (lado El Niño)</span>
+                    <span><i style="background:#2a78d6"></i>Abaixo de zero (lado La Niña)</span>
+                    <span><i class="cl-leg-proj"></i>Projetado (com incerteza)</span>
+                    <span><i class="cl-leg-tracejado cl-leg-tracejado--cinza"></i>Limiar ±0,5</span>
+                </div>
+                <svg class="ff-grafico cl-grafico" viewBox="0 0 @F(W) @F(H)" role="img" aria-label="ONI observado nos últimos 12 meses e projeção para os próximos 12">
+                    @for (var v = -topo; v <= topo + 1e-6; v += 0.5)
+                    {
+                        <line x1="@F(mE)" x2="@F(W - mD)" y1="@F(Y(v))" y2="@F(Y(v))" stroke="@(Math.Abs(v) < 1e-6 ? "#c3c2b7" : "#f0f0f0")" stroke-width="1" />
+                        @:<text x="@F(mE - 6)" y="@F(Y(v) + 3)" text-anchor="end">@S(v)</text>
+                    }
+                    <line x1="@F(mE)" x2="@F(W - mD)" y1="@F(Y(0.5))" y2="@F(Y(0.5))" stroke="#898781" stroke-width="1" stroke-dasharray="4 4" />
+                    <line x1="@F(mE)" x2="@F(W - mD)" y1="@F(Y(-0.5))" y2="@F(Y(-0.5))" stroke="#898781" stroke-width="1" stroke-dasharray="4 4" />
+                    @if (primeiroProj > 0)
+                    {
+                        var xd = mE + larg * primeiroProj;
+                        <line x1="@F(xd)" x2="@F(xd)" y1="@F(mT - 10)" y2="@F(H - mB)" stroke="#898781" stroke-width="1" />
+                        @:<text x="@F(xd - 5)" y="@F(mT - 2)" text-anchor="end" class="cl-eixo-unid">observado</text>
+                        @:<text x="@F(xd + 5)" y="@F(mT - 2)" class="cl-eixo-unid">projeção</text>
+                    }
+                    @for (var i = 0; i < pontos.Count; i++)
+                    {
+                        var p = pontos[i];
+                        var bw = Math.Min(20, larg * 0.62);
+                        var cor = p.Oni >= 0 ? (p.Proj ? "#f0a2a1" : "#e34948") : (p.Proj ? "#9ec5f4" : "#2a78d6");
+                        <path d="@Barra(X(i) - bw / 2, bw, p.Oni)" fill="@cor" />
+                        @if (p.Proj && p.Inc > 0)
+                        {
+                            <line x1="@F(X(i))" x2="@F(X(i))" y1="@F(Y(p.Oni + p.Inc))" y2="@F(Y(p.Oni - p.Inc))" stroke="#52514e" stroke-width="1.2" />
+                        }
+                        @:<text x="@F(X(i))" y="@F(H - mB + 14)" text-anchor="middle">@(MesCurto(p.Mes)[..1])</text>
+                        @if (p.Mes == 1 || i == 0)
+                        {
+                            @:<text x="@F(X(i))" y="@F(H - mB + 27)" text-anchor="middle" class="cl-eixo-unid">@p.Ano</text>
+                        }
+                    }
+                    @if (pontos.Count > 0)
+                    {
+                        var u = pontos.FindLastIndex(p => !p.Proj);
+                        if (u >= 0)
+                        {
+                            var pu = pontos[u];
+                            @:<text x="@F(X(u))" y="@F(pu.Oni >= 0 ? Y(pu.Oni) - 5 : Y(pu.Oni) + 12)" text-anchor="middle" class="cl-rotulo-direto">@S(pu.Oni)</text>
+                        }
+                        var pico = pontos.Select((p, i) => (p, i)).Where(t => t.p.Proj).OrderByDescending(t => Math.Abs(t.p.Oni)).FirstOrDefault();
+                        if (pico.p.Proj)
+                        {
+                            @:<text x="@F(X(pico.i))" y="@F(pico.p.Oni >= 0 ? Y(pico.p.Oni + pico.p.Inc) - 5 : Y(pico.p.Oni - pico.p.Inc) + 12)" text-anchor="middle" class="cl-rotulo-direto">@S(pico.p.Oni)</text>
+                        }
+                    }
+                    @for (var i = 0; i < pontos.Count; i++)
+                    {
+                        var p = pontos[i];
+                        var dica = $"{NomeMes(p.Mes)}/{p.Ano} · {(p.Proj ? "projetado" : "observado")}\n{p.Desc}" + (p.Proj ? $"\nIncerteza: ±{N(p.Inc, 2)}" : "");
+                        <g class="ff-hit" data-tip="@dica">
+                            <line x1="@F(X(i))" x2="@F(X(i))" y1="@F(mT)" y2="@F(H - mB)" stroke="rgba(0,0,0,.25)" stroke-width="1" />
+                            <rect x="@F(X(i) - larg / 2)" y="0" width="@F(larg)" height="@F(H)" />
+                        </g>
+                    }
+                </svg>
+            </section>
+        </div>
+
+        <section class="cm-card cm-tabela-wrap">
+            <div class="cl-card__cab cl-card__cab--pad">
+                <h2>O que El Niño e La Niña fazem nesta região</h2>
+                <span class="cm-contador">medido nos dados de @imp.Periodo · evento moderado (ONI ±1,0)</span>
+            </div>
+            <p class="cm-ajuda cl-pad">
+                Diferença em relação à normal de cada mês. Vermelho = mais seco ou mais quente; azul = mais chuvoso ou mais frio.
+                Valores em cinza com “~” têm evidência fraca e quase não pesam na previsão; “—” = sem efeito detectado.
+            </p>
+            <div class="cm-tabela-scroll">
+                <table class="cm-tabela cl-mapa">
+                    <thead>
+                        <tr>
+                            <th rowspan="2">Mês</th>
+                            <th colspan="2" class="cl-centro">Chuva (%)</th>
+                            <th colspan="2" class="cl-centro">Temp. máxima (°C)</th>
+                            <th colspan="2" class="cl-centro">Temp. mínima (°C)</th>
+                        </tr>
+                        <tr>
+                            @foreach (var c in colunas)
+                            {
+                                <th class="cl-centro">@c.Titulo</th>
+                            }
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @for (var mes = 1; mes <= 12; mes++)
+                        {
+                            <tr>
+                                <td><b>@NomeMes(mes)</b></td>
+                                @foreach (var c in colunas)
+                                {
+                                    var l = L(mes, c.Var);
+                                    if (l is null) { <td class="cl-centro">—</td> continue; }
+                                    var chuva = c.Var == "chuva";
+                                    double? valor = chuva ? (c.Nino ? l.ElNinoModeradoPct : l.LaNinaModeradaPct) : (c.Nino ? l.ElNinoModerado : l.LaNinaModerada);
+                                    var bruto = c.Nino ? l.ElNinoModerado : l.LaNinaModerada;
+                                    var evid = c.Nino ? l.EvidenciaElNino : l.EvidenciaLaNina;
+                                    var t = c.Nino ? l.TElNino : l.TLaNina;
+                                    var anos = c.Nino ? l.AnosElNino : l.AnosLaNina;
+                                    var v = valor ?? 0;
+                                    var quente = chuva ? v < 0 : v > 0;
+                                    var zero = Math.Abs(v) < (chuva ? 0.5 : 0.05);
+                                    var cor = zero ? "transparent" : CorDivergente(v, chuva ? 20 : 0.8, quente);
+                                    var texto = zero ? "—" : (evid == "fraca" ? "~" : "") + (chuva ? S(v, 0) + "%" : S(v, 2));
+                                    var dica = $"{NomeMes(mes)} · {(c.Nino ? "El Niño" : "La Niña")} moderado(a)\n" +
+                                               $"{NomeVariavel(c.Var)}: {(chuva ? S(v, 0) + "% (" + S(bruto, 0) + " mm)" : S(v, 2) + " °C")} em relação à normal ({N(l.Normal, chuva ? 0 : 1)} {Unidade(c.Var)})\n" +
+                                               $"Evidência {evid} (t = {N(t, 1)}; {anos} meses de {(c.Nino ? "El Niño" : "La Niña")} na série)";
+                                    <td class="cl-centro cl-celula @(evid == "fraca" || zero ? "is-fraca" : "") @(evid == "forte" ? "is-forte" : "")" style="background:@cor" data-tip="@dica">@texto</td>
+                                }
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+            <p class="cl-rodape">@imp.ComoLer</p>
+        </section>
+    }
+</div>
+<partial name="_ScriptsClima" />

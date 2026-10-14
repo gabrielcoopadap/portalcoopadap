@@ -1,0 +1,33 @@
+@inject Microsoft.Extensions.Configuration.IConfiguration Config
+@{
+    ViewData["Title"] = "Início";
+    var nome = (User.Identity?.IsAuthenticated == true ? (User.FindFirst("name")?.Value ?? User.Identity?.Name) : Config["Autenticacao:UsuarioTeste"]) ?? "Cooperado";
+    var atalhos = new[]
+    {
+        ("dashboard", "Gestão de Certificações", "Painel com conformidade, ações prioritárias e pendências", "/certificacao"),
+        ("verified", "Certificações Ativas", "Rainforest Alliance, GlobalG.A.P., SMETA, CAFE Practices", "/certificacao/certificacoes"),
+        ("checklist", "Requisitos", "Lista mestra das normas e exportação em Excel", "/certificacao/requisitos"),
+        ("fact_check", "Vistorias", "Vistorias mensais e diárias, apontamentos e relatório PDF", "/certificacao/vistorias"),
+        ("eco", "Ambiental", "CAR, alertas de desmatamento e NDVI por satélite", "/certificacao/ambiental"),
+        ("forest", "Fauna e Flora", "Mapa de biodiversidade, câmeras e registros de espécies", "/certificacao/fauna-flora"),
+        ("thermostat", "Clima e El Niño", "Previsão do ano com El Niño / La Niña, riscos e validação", "/clima"),
+    };
+}
+<div class="pt-banner">
+    <div class="pt-banner__texto">Cooperativismo que vai além do campo</div>
+</div>
+<div class="pt-home">
+    <p class="pt-boasvindas">Bem-vindo(a) de volta, <span>@nome.ToUpperInvariant()</span> !</p>
+
+    <div class="pt-secao-titulo"><span class="material-icons">workspace_premium</span><span>Novo módulo: Certificação</span></div>
+    <p class="pt-ajuda">Ambiente de teste do módulo. Use o menu <b>Atendimentos → Certificação</b> ou os atalhos abaixo.</p>
+    <div class="pt-atalhos">
+        @foreach (var (icone, titulo, texto, rota) in atalhos)
+        {
+            <a class="pt-atalho" href="@rota">
+                <span class="material-icons">@icone</span>
+                <span><b>@titulo</b><small>@texto</small></span>
+            </a>
+        }
+    </div>
+</div>

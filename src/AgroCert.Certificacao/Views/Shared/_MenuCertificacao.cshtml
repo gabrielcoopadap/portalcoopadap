@@ -1,0 +1,31 @@
+@{
+    var caminho = (Context.Request.Path.Value ?? "").TrimEnd('/').ToLowerInvariant();
+    var aberto = caminho.StartsWith("/certificacao");
+    bool Ativo(string rota, bool exato) => exato ? caminho == rota || caminho == rota + "/gestao" : caminho.StartsWith(rota);
+    var itens = new (string Icone, string Texto, string Rota, bool Exato)[]
+    {
+        ("dashboard", "Gestão de Certificações", "/certificacao", true),
+        ("verified", "Certificações Ativas", "/certificacao/certificacoes", false),
+        ("checklist", "Requisitos", "/certificacao/requisitos", false),
+        ("fact_check", "Vistorias", "/certificacao/vistorias", false),
+        ("eco", "Ambiental", "/certificacao/ambiental", false),
+        ("park", "Corredores Ecológicos", "/certificacao/corredores", false),
+        ("forest", "Fauna e Flora", "/certificacao/fauna-flora", false),
+    };
+}
+<div class="menu-grupo @(aberto ? "is-aberto" : "")" data-menu-grupo>
+    <button type="button" class="menu-item entry" data-alternar-submenu aria-expanded="@(aberto ? "true" : "false")" aria-controls="submenu-certificacao">
+        <span class="material-icons" aria-hidden="true">workspace_premium</span>
+        <span class="menu-text menu-route-text">Certificação</span>
+        <span class="material-icons menu-seta" aria-hidden="true">keyboard_arrow_down</span>
+    </button>
+    <div class="submenu-container" id="submenu-certificacao">
+        @foreach (var (icone, texto, rota, exato) in itens)
+        {
+            <a class="menu-item entry submenu-item @(Ativo(rota, exato) ? "active-menu-item" : "")" href="@rota" aria-current="@(Ativo(rota, exato) ? "page" : null)">
+                <span class="material-icons" aria-hidden="true">@icone</span>
+                <span class="menu-text menu-route-text">@texto</span>
+            </a>
+        }
+    </div>
+</div>

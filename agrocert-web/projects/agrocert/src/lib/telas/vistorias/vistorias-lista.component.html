@@ -1,0 +1,89 @@
+<div class="cm-topo">
+  <div>
+    <h1 class="cm-titulo"><span class="material-icons" aria-hidden="true">fact_check</span> Vistorias</h1>
+    <p class="cm-subtitulo">Vistorias mensais da consultoria e diárias da fazenda, com o mesmo formulário de conformidade</p>
+  </div>
+  <div class="cm-acoes">
+    <a class="cm-btn cm-btn--contorno" [routerLink]="['vistorias', 'pendencias'] | acRota"><span class="material-icons" aria-hidden="true">pending_actions</span> Pendências ({{ pendencias }})</a>
+    <button type="button" class="cm-btn cm-btn--primario" (click)="abrirNova()"><span class="material-icons" aria-hidden="true">add</span> Nova Vistoria</button>
+  </div>
+</div>
+
+<ac-estado [carregando]="!todas && !erro" [erro]="erro" (tentarDeNovo)="carregar()"></ac-estado>
+
+<ng-container *ngIf="todas">
+  <section class="cm-stats">
+    <div class="cm-card cm-stat" style="--cor:#1f6fb2"><div class="cm-stat__valor">{{ todas.length }}</div><div class="cm-stat__rotulo">Vistorias realizadas</div></div>
+    <div class="cm-card cm-stat" style="--cor:#5e9a42"><div class="cm-stat__valor">{{ mensais }}</div><div class="cm-stat__rotulo">Mensais (consultoria)</div></div>
+    <div class="cm-card cm-stat" style="--cor:#b8860b"><div class="cm-stat__valor">{{ diarias }}</div><div class="cm-stat__rotulo">Diárias (funcionário)</div></div>
+    <div class="cm-card cm-stat" style="--cor:#c0392b"><div class="cm-stat__valor">{{ pendencias }}</div><div class="cm-stat__rotulo">Pendências em aberto</div></div>
+  </section>
+
+  <div class="cm-abas-linha">
+    <nav class="cm-abas" aria-label="Tipo de vistoria">
+      <a *ngFor="let ab of abas" class="cm-aba" [class.is-ativa]="aba === ab.valor" [routerLink]="[]"
+         [queryParams]="{ tipo: ab.valor === 'TODAS' ? null : ab.valor }" queryParamsHandling="merge">{{ ab.rotulo }}</a>
+    </nav>
+    <span class="cm-contador">{{ filtradas.length }} vistoria(s)</span>
+  </div>
+
+  <div class="cm-card cm-tabela-wrap">
+    <div class="cm-tabela-scroll">
+      <table class="cm-tabela">
+        <thead><tr><th>Código</th><th>Unidade / Propriedade</th><th>Tipo</th><th>Data</th><th>Responsável</th><th>Apontamentos</th></tr></thead>
+        <tbody>
+          <tr *ngIf="filtradas.length === 0"><td colspan="6" class="cm-tabela__vazio">Nenhuma vistoria registrada ainda.</td></tr>
+          <tr *ngFor="let v of filtradas" class="is-clicavel" tabindex="0" (click)="abrir(v)" (keydown.enter)="abrir(v)">
+            <td><span class="cm-codigo">{{ v.codigoDocumento }}</span></td>
+            <td>
+              <div class="cm-t-titulo">{{ v.unidadePropriedade }}</div>
+              <div *ngIf="v.setorArea?.trim()" class="cm-t-sub">{{ v.setorArea }}</div>
+            </td>
+            <td>{{ rotuloTipoVistoria(v.tipo) }}</td>
+            <td>{{ v.dataVistoria | acData }}</td>
+            <td>{{ v.tecnicoResponsavel?.trim() ? v.tecnicoResponsavel : '—' }}</td>
+            <td>
+              <ac-pilula *ngIf="v.emAberto > 0" [texto]="v.emAberto + ' aberto(s)'" [estilo]="estiloAberto"></ac-pilula>
+              <ac-pilula *ngIf="v.encerrados > 0" [texto]="v.encerrados + ' encerrado(s)'" [estilo]="estiloEncerrado"></ac-pilula>
+              <span *ngIf="v.totalApontamentos === 0" class="cm-t-sub">sem apontamentos</span>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</ng-container>
+
+<ac-modal [aberto]="novaAberta" titulo="Nova Vistoria" (fechar)="novaAberta = false">
+  <form #f="ngForm" (ngSubmit)="f.valid && criar()">
+    <div class="cm-modal__corpo">
+      <span class="cm-rotulo">Tipo de vistoria</span>
+      <div class="cm-opcoes" style="margin-top:6px">
+        <ng-container *ngFor="let t of tiposVistoria">
+          <input type="radio" [id]="'tipo-' + t.valor" name="Tipo" [value]="t.valor" [attr.value]="t.valor" [(ngModel)]="nova.tipo" />
+          <label [for]="'tipo-' + t.valor">{{ t.rotulo }}</label>
+        </ng-container>
+      </div>
+      <div class="cm-linha">
+        <div class="cm-campo"><label for="v-unid">Unidade / Propriedade *</label><input id="v-unid" class="cm-input" name="UnidadePropriedade" required [(ngModel)]="nova.unidadePropriedade" placeholder="Ex: Fazenda Santa Rita" /></div>
+        <div class="cm-campo"><label for="v-setor">Setor / Área</label><input id="v-setor" class="cm-input" name="SetorArea" [(ngModel)]="nova.setorArea" placeholder="Ex: Talhão 4 — Secagem" /></div>
+      </div>
+      <div class="cm-linha">
+        <div class="cm-campo"><label for="v-data">Data da vistoria *</label><input id="v-data" type="date" class="cm-input" name="DataVistoria" required [(ngModel)]="nova.dataVistoria" /></div>
+        <div class="cm-campo"><label for="v-motivo">Motivo</label><input id="v-motivo" class="cm-input" name="Motivo" [(ngModel)]="nova.motivo" placeholder="Ex: Vistoria de rotina" /></div>
+      </div>
+      <div class="cm-linha">
+        <div class="cm-campo"><label for="v-resp">Responsável pela vistoria</label><input id="v-resp" class="cm-input" name="TecnicoResponsavel" [(ngModel)]="nova.tecnicoResponsavel" /></div>
+        <div class="cm-campo"><label for="v-cargo">Cargo</label><input id="v-cargo" class="cm-input" name="CargoTecnico" [(ngModel)]="nova.cargoTecnico" placeholder="Ex: Consultora Técnica" /></div>
+      </div>
+      <div class="cm-linha">
+        <div class="cm-campo"><label for="v-aprov">Aprovado por</label><input id="v-aprov" class="cm-input" name="AprovadoPor" [(ngModel)]="nova.aprovadoPor" /></div>
+        <div class="cm-campo"><label for="v-cargo-ap">Cargo do aprovador</label><input id="v-cargo-ap" class="cm-input" name="CargoAprovador" [(ngModel)]="nova.cargoAprovador" placeholder="Ex: Gerente de Certificação" /></div>
+      </div>
+    </div>
+    <div class="cm-modal__acoes">
+      <button type="button" class="cm-btn cm-btn--contorno" (click)="novaAberta = false">Cancelar</button>
+      <button type="submit" class="cm-btn cm-btn--primario" [class.is-carregando]="salvando" [disabled]="salvando">{{ salvando ? 'Abrindo...' : 'Abrir Vistoria' }}</button>
+    </div>
+  </form>
+</ac-modal>

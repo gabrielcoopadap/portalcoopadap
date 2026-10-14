@@ -1,0 +1,96 @@
+<ac-clima-cabecalho aba="validacao" [erro]="erro"></ac-clima-cabecalho>
+<ac-clima-indisponivel *ngIf="indisponivel" [endereco]="endereco" (tentarDeNovo)="carregar()"></ac-clima-indisponivel>
+
+<ng-container *ngIf="!indisponivel">
+<form class="cm-card cl-filtros cl-filtros--curto" (ngSubmit)="mudarAntecedencia()">
+  <div class="cm-campo">
+    <label for="cl-ant">ONI previsto com antecedência de</label>
+    <select id="cl-ant" class="cm-select" name="antecedencia" [(ngModel)]="selecionada" (ngModelChange)="mudarAntecedencia()">
+      <option *ngFor="let a of opcoes" [ngValue]="a">{{ a }} meses</option>
+    </select>
+  </div>
+  <p class="cm-ajuda cl-filtros__ajuda">
+    Cada ano da série é previsto com o modelo ajustado <b>sem</b> aquele ano. Assim dá para ver quanto o El Niño/La Niña
+    realmente melhora a previsão nesta estação — e quanto a regra antiga (−15% de chuva no El Niño) atrapalhava.
+  </p>
+</form>
+
+<ac-estado [carregando]="carregando"></ac-estado>
+
+<ng-container *ngIf="v">
+  <section class="cm-card cm-tabela-wrap">
+    <div class="cl-card__cab cl-card__cab--pad"><h2>Erro médio por variável</h2><span class="cm-contador">{{ v.anos }}</span></div>
+    <div class="cm-tabela-scroll">
+      <table class="cm-tabela cl-tabela">
+        <thead>
+          <tr>
+            <th>Variável</th>
+            <th class="cl-num">Só a média histórica</th>
+            <th class="cl-num">Regra antiga fixa</th>
+            <th class="cl-num">Com ENSO (ONI real)</th>
+            <th class="cl-num">Com ENSO (ONI previsto {{ antecedencia }} m antes)</th>
+            <th>Resultado</th>
+            <th class="cl-num">Acerto da faixa 80%</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let l of linhas">
+            <td><b>{{ cf.nomeVariavel(l.nome) }}</b><div class="cm-t-sub">{{ l.r.meses }} meses testados</div></td>
+            <td class="cl-num">{{ cf.n(l.r.erroMedioClimatologia, l.casas) }} {{ l.u }}</td>
+            <td class="cl-num">{{ cf.n(l.r.erroMedioMetodoAntigo, l.casas) }} {{ l.u }}</td>
+            <td class="cl-num"><b>{{ cf.n(l.r.erroMedioEnsoObservado, l.casas) }} {{ l.u }}</b></td>
+            <td class="cl-num">{{ cf.n(l.r.erroMedioEnsoPrevisto, l.casas) }} {{ l.u }}</td>
+            <td>
+              <div><span class="material-icons" aria-hidden="true" style="font-size:16px;vertical-align:-3px">{{ l.icone }}</span> vs. média: {{ ganho(l.r.ganhoVsClimatologiaPct) }}</div>
+              <div class="cm-t-sub">vs. regra antiga: {{ ganho(l.r.ganhoVsMetodoAntigoPct) }}</div>
+            </td>
+            <td class="cl-num">{{ cf.pct(l.r.cobertura_intervalo_80) }}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="cl-rodape">{{ v.comoLer }}</p>
+  </section>
+
+  <div class="cl-duas">
+    <section *ngFor="let p of paineis" class="cm-card cl-card">
+      <div class="cl-card__cab"><h2>{{ p.titulo }}: ganho por mês</h2><span class="cm-contador">% a menos de erro que a média</span></div>
+      <svg class="ff-grafico cl-grafico" [attr.viewBox]="'0 0 ' + W + ' ' + H" role="img" [attr.aria-label]="'Redução do erro com ENSO por mês — ' + p.titulo">
+        <ng-container *ngFor="let g of p.grade">
+          <svg:line [attr.x1]="ME" [attr.x2]="W - MD" [attr.y1]="g.y" [attr.y2]="g.y" [attr.stroke]="g.cor" stroke-width="1" />
+          <svg:text [attr.x]="ME - 6" [attr.y]="g.yTexto" text-anchor="end">{{ g.rotulo }}</svg:text>
+        </ng-container>
+        <ng-container *ngFor="let b of p.barras">
+          <svg:path [attr.d]="b.d" fill="#2a78d6" />
+          <svg:text [attr.x]="b.x" [attr.y]="H - 8" text-anchor="middle">{{ b.letra }}</svg:text>
+          <svg:text *ngIf="b.rotulo" [attr.x]="b.x" [attr.y]="b.rotulo.y" text-anchor="middle" class="cl-rotulo-direto">{{ b.rotulo.texto }}</svg:text>
+        </ng-container>
+        <svg:g *ngFor="let b of p.barras" class="ff-hit" [acTip]="b.dica">
+          <svg:line [attr.x1]="b.x" [attr.x2]="b.x" [attr.y1]="MT" [attr.y2]="H - MB" stroke="rgba(0,0,0,.25)" stroke-width="1" />
+          <svg:rect [attr.x]="b.xHit" y="0" [attr.width]="larg" [attr.height]="H" />
+        </svg:g>
+      </svg>
+    </section>
+  </div>
+
+  <details class="cm-card cl-card cl-metodo">
+    <summary>Resultado separado por fase do ENSO</summary>
+    <div class="cm-tabela-scroll">
+      <table class="cm-tabela cl-tabela">
+        <thead><tr><th>Variável · fase</th><th class="cl-num">Meses</th><th class="cl-num">Só a média</th><th class="cl-num">Regra antiga</th><th class="cl-num">Com ENSO</th><th class="cl-num">Ganho</th></tr></thead>
+        <tbody>
+          <tr *ngFor="let f of porFase">
+            <td>{{ cf.nomeVariavel(f.variavel) }} · <span [class]="'cl-fase ' + cf.classeFase(f.fase)">{{ cf.nomeFase(f.fase) }}</span></td>
+            <td class="cl-num">{{ f.r.meses }}</td>
+            <td class="cl-num">{{ cf.n(f.r.erroMedioClimatologia, 2) }}</td>
+            <td class="cl-num">{{ cf.n(f.r.erroMedioMetodoAntigo, 2) }}</td>
+            <td class="cl-num">{{ cf.n(f.r.erroMedioEnsoObservado, 2) }}</td>
+            <td class="cl-num">{{ cf.s(f.r.ganhoVsClimatologiaPct) }}%</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="cl-rodape">{{ v.metodo }}</p>
+  </details>
+</ng-container>
+</ng-container>

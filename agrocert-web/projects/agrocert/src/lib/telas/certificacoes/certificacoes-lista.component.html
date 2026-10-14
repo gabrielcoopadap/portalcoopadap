@@ -1,0 +1,49 @@
+<div class="cm-topo">
+  <div>
+    <h1 class="cm-titulo"><span class="material-icons" aria-hidden="true">workspace_premium</span> Certificações Ativas</h1>
+    <p class="cm-subtitulo">Gestão e acompanhamento das {{ lista?.length ?? 0 }} certificações ativas</p>
+  </div>
+  <div class="cm-acoes">
+    <button type="button" class="cm-btn cm-btn--primario" (click)="novaAberta = true"><span class="material-icons" aria-hidden="true">add</span> Nova Certificação</button>
+  </div>
+</div>
+
+<ac-estado [carregando]="!lista && !erro" [erro]="erro" (tentarDeNovo)="carregar()"></ac-estado>
+
+<ng-container *ngIf="lista">
+  <div *ngIf="lista.length === 0" class="cm-vazio">Nenhuma certificação cadastrada ainda.</div>
+
+  <div class="cm-grade">
+    <article *ngFor="let c of lista" class="cm-card cm-cert">
+      <div class="cm-cert__topo">
+        <span class="cm-avatar" [style.background]="c.cor">{{ c.sigla }}</span>
+        <div class="cm-cert__id">
+          <div class="cm-cert__nome">{{ c.nome }}</div>
+          <div class="cm-cert__escopo" [title]="c.escopo ?? ''">{{ c.escopo }}</div>
+        </div>
+        <ac-pilula [texto]="c.status" [estilo]="R.estiloStatusCertificacao(c.status)"></ac-pilula>
+      </div>
+
+      <div class="cm-conf" [style.background]="R.corSuave(c.cor)">
+        <div>
+          <div class="cm-conf__pct" [style.color]="c.cor">{{ c.conformidade ?? 0 }}%</div>
+          <div class="cm-conf__legenda">conformidade geral</div>
+        </div>
+        <div class="cm-conf__req" [style.color]="c.cor">{{ c.conformes ?? 0 }}/{{ c.totalRequisitos ?? 0 }}<span>requisitos</span></div>
+      </div>
+
+      <div class="cm-detalhes">
+        <div><span class="cm-dl">Organismo</span><span class="cm-dv">{{ c.organismo && c.organismo.trim() ? c.organismo : '—' }}</span></div>
+        <div><span class="cm-dl">Válido até</span><span class="cm-dv">{{ F.data(c.validoAte) }}</span></div>
+        <div><span class="cm-dl">Última auditoria</span><span class="cm-dv">{{ F.data(c.ultimaAuditoria) }}</span></div>
+        <div><span class="cm-dl">Próxima auditoria</span><span class="cm-dv" style="color:var(--cm-verde-texto)">{{ F.data(c.proximaAuditoria) }}</span></div>
+      </div>
+
+      <div class="cm-rodape-card">
+        <a [routerLink]="['certificacoes', c.id] | acRota">Ver detalhes e categorias →</a>
+      </div>
+    </article>
+  </div>
+</ng-container>
+
+<ac-form-certificacao [aberto]="novaAberta" [certificacao]="null" (fechar)="novaAberta = false" (salvo)="criada($event)"></ac-form-certificacao>

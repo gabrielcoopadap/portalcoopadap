@@ -1,0 +1,50 @@
+<ac-modal [aberto]="aberto" [titulo]="edicao ? 'Editar Certificação' : 'Nova Certificação'" (fechar)="fechar.emit()">
+  <form ngNativeValidate (ngSubmit)="salvar()">
+    <div class="cm-modal__corpo">
+      <div class="cm-linha" style="grid-template-columns:3fr 1fr">
+        <div class="cm-campo"><label for="c-nome">Nome *</label><input id="c-nome" class="cm-input" name="Nome" required [(ngModel)]="f.nome" placeholder="Ex: Rainforest Alliance" /></div>
+        <div class="cm-campo"><label for="c-sigla">Sigla</label><input id="c-sigla" class="cm-input" name="Sigla" maxlength="3" [(ngModel)]="f.sigla" /></div>
+      </div>
+      <div class="cm-campo"><label for="c-escopo">Escopo</label><input id="c-escopo" class="cm-input" name="Escopo" [(ngModel)]="f.escopo" placeholder="Ex: Produção de café — 420 ha" /></div>
+      <div class="cm-linha">
+        <div class="cm-campo"><label for="c-status">Status</label>
+          <select id="c-status" class="cm-select" name="Status" [(ngModel)]="f.status">
+            <option *ngFor="let s of statusLista" [value]="s">{{ s }}</option>
+          </select>
+        </div>
+        <div class="cm-campo"><label for="c-cor">Cor</label><input id="c-cor" type="color" class="cm-input" name="Cor" [(ngModel)]="f.cor" /></div>
+      </div>
+      <p class="cm-ajuda">Conformidade, totais e contagens são recalculados automaticamente quando há requisitos da norma na lista mestra; os valores abaixo valem para normas sem requisitos cadastrados.</p>
+      <div class="cm-linha">
+        <div class="cm-campo"><label for="c-conf">Conformidade (%)</label><input id="c-conf" type="number" min="0" max="100" class="cm-input" name="Conformidade" [(ngModel)]="f.conformidade" /></div>
+        <div class="cm-campo"><label for="c-total">Total de requisitos</label><input id="c-total" type="number" min="0" class="cm-input" name="TotalRequisitos" [(ngModel)]="f.totalRequisitos" /></div>
+      </div>
+      <div class="cm-linha cm-linha--3">
+        <div class="cm-campo"><label for="c-cf">Conformes</label><input id="c-cf" type="number" min="0" class="cm-input" name="Conformes" [(ngModel)]="f.conformes" /></div>
+        <div class="cm-campo"><label for="c-pd">Pendentes</label><input id="c-pd" type="number" min="0" class="cm-input" name="Pendentes" [(ngModel)]="f.pendentes" /></div>
+        <div class="cm-campo"><label for="c-nc">Não conformes</label><input id="c-nc" type="number" min="0" class="cm-input" name="NaoConformes" [(ngModel)]="f.naoConformes" /></div>
+      </div>
+      <div class="cm-campo"><label for="c-org">Organismo certificador</label><input id="c-org" class="cm-input" name="Organismo" [(ngModel)]="f.organismo" placeholder="Ex: Bureau Veritas" /></div>
+      <div class="cm-linha cm-linha--3">
+        <div class="cm-campo"><label for="c-val">Válido até</label><input id="c-val" type="date" class="cm-input" name="ValidoAte" [(ngModel)]="f.validoAte" /></div>
+        <div class="cm-campo"><label for="c-ult">Última auditoria</label><input id="c-ult" type="date" class="cm-input" name="UltimaAuditoria" [(ngModel)]="f.ultimaAuditoria" /></div>
+        <div class="cm-campo"><label for="c-prox">Próxima auditoria</label><input id="c-prox" type="date" class="cm-input" name="ProximaAuditoria" [(ngModel)]="f.proximaAuditoria" /></div>
+      </div>
+
+      <span class="cm-rotulo">Conformidade por categoria</span>
+      <div class="cm-lista-edit" id="lista-categorias" style="margin-top:6px">
+        <div *ngFor="let cat of f.categorias; let i = index" class="cm-lista-edit__linha cm-lista-edit__linha--cat">
+          <input class="cm-input" [name]="'Categorias[' + i + '].Nome'" placeholder="Categoria" [(ngModel)]="cat.nome" aria-label="Categoria" />
+          <input class="cm-input" type="number" min="0" [name]="'Categorias[' + i + '].Conformes'" placeholder="Conformes" [(ngModel)]="cat.conformes" aria-label="Conformes" />
+          <input class="cm-input" type="number" min="0" [name]="'Categorias[' + i + '].Total'" placeholder="Total" [(ngModel)]="cat.total" aria-label="Total" />
+          <button type="button" class="cm-icone-btn" title="Remover" (click)="removerCategoria(i)"><span class="material-icons" aria-hidden="true">close</span></button>
+        </div>
+      </div>
+      <button type="button" class="cm-btn cm-btn--texto cm-btn--pequeno" (click)="adicionarCategoria()"><span class="material-icons" aria-hidden="true">add</span> Categoria</button>
+    </div>
+    <div class="cm-modal__acoes">
+      <button type="button" class="cm-btn cm-btn--contorno" (click)="fechar.emit()">Cancelar</button>
+      <button type="submit" class="cm-btn cm-btn--primario" [class.is-carregando]="salvando" [disabled]="salvando">{{ salvando ? 'Salvando...' : (edicao ? 'Salvar' : 'Cadastrar') }}</button>
+    </div>
+  </form>
+</ac-modal>

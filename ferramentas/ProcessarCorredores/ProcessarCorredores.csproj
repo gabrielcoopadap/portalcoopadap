@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Ferramenta de linha de comando: calcula os corredores ecológicos (MapBiomas + CAR) para o portal. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <InvariantGlobalization>false</InvariantGlobalization>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="..\RecortarMapBiomas\GeoTiff.cs" Link="GeoTiff.cs" />
+  </ItemGroup>
+</Project>

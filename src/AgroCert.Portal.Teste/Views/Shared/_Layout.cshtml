@@ -1,0 +1,119 @@
+@inject Microsoft.Extensions.Configuration.IConfiguration Config
+@inject Microsoft.AspNetCore.Hosting.IWebHostEnvironment Ambiente
+@{
+    var caminho = (Context.Request.Path.Value ?? "/").ToLowerInvariant();
+    var nomeUsuario = (User.Identity?.IsAuthenticated == true
+        ? (User.FindFirst("name")?.Value ?? User.Identity?.Name)
+        : Config["Autenticacao:UsuarioTeste"]) ?? "USUÁRIO";
+    var autenticacao = Config.GetValue("Autenticacao:Habilitada", false);
+    string Ativo(string rota) => caminho == rota ? "active-menu-item" : "";
+    var logo = new[] { "logo-coopadap.svg", "logo-coopadap.png", "logo-coopadap.jpg" }
+        .FirstOrDefault(n => Ambiente.WebRootFileProvider.GetFileInfo("img/" + n).Exists);
+}
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@(ViewData["Title"] is string t ? t + " · " : "")Portal Coopadap</title>
+    <link rel="stylesheet" href="~/_content/AgroCert.Certificacao/lib/material-icons/material-icons.css" />
+    <link rel="stylesheet" href="~/css/portal.css" asp-append-version="true" />
+</head>
+<body>
+    <header class="pt-toolbar">
+        <div class="pt-toolbar__esq">
+            <button type="button" class="toggle-button" data-alternar-menu aria-label="Mostrar/ocultar menu">
+                <span class="material-icons">menu</span>
+            </button>
+        </div>
+        <a class="pt-logo" href="/" aria-label="Portal Coopadap — Início">
+            @if (logo is not null)
+            {
+                <img class="pt-logo__img" src="~/img/@logo" alt="Coopadap" asp-append-version="true" />
+            }
+            else
+            {
+                <span class="material-icons pt-logo__icone" aria-hidden="true">spa</span><span class="pt-logo__texto">coopadap</span>
+            }
+        </a>
+        <div class="pt-toolbar__dir">
+            <span class="material-icons" title="Notificações">notifications</span>
+            <span class="pt-usuario">@nomeUsuario.ToUpperInvariant()</span>
+            @if (autenticacao && User.Identity?.IsAuthenticated == true)
+            {
+                <a class="pt-sair" href="/MicrosoftIdentity/Account/SignOut" title="Sair"><span class="material-icons">logout</span></a>
+            }
+            else
+            {
+                <span class="material-icons">keyboard_arrow_down</span>
+            }
+        </div>
+    </header>
+
+    <div class="pt-corpo">
+        <nav class="pt-sidenav" aria-label="Menu principal">
+            <a class="menu-item entry @Ativo("/")" href="/">
+                <span class="material-icons">home</span><span class="menu-text menu-group-title">Início</span>
+            </a>
+            <hr class="mat-divider" />
+
+            <div class="menu-grupo is-aberto" data-menu-grupo>
+                <button type="button" class="menu-item entry" data-alternar-submenu aria-expanded="true">
+                    <span class="material-icons">label_important</span>
+                    <span class="menu-text menu-group-title">Atendimentos</span>
+                    <span class="material-icons menu-seta">keyboard_arrow_down</span>
+                </button>
+                <div class="submenu-container">
+                    <a class="menu-item entry" href="/portal/meu-estoque"><span class="material-icons">inventory</span><span class="menu-text menu-route-text">Meu Estoque</span></a>
+                    <a class="menu-item entry" href="/portal/minhas-vendas"><span class="material-icons">request_quote</span><span class="menu-text menu-route-text">Minhas Vendas</span></a>
+                    <div class="menu-grupo" data-menu-grupo>
+                        <button type="button" class="menu-item entry" data-alternar-submenu aria-expanded="false">
+                            <span class="material-icons">task</span><span class="menu-text menu-route-text">Planejamento Agrícola</span><span class="material-icons menu-seta">keyboard_arrow_down</span>
+                        </button>
+                        <div class="submenu-container">
+                            <a class="menu-item entry submenu-item" href="/portal/planejamento-insumos"><span class="material-icons">eco</span><span class="menu-text menu-route-text">Planejamento de Insumos</span></a>
+                            <a class="menu-item entry submenu-item" href="/portal/planejamento-plantio"><span class="material-icons">agriculture</span><span class="menu-text menu-route-text">Planejamento de Plantio</span></a>
+                        </div>
+                    </div>
+                    <a class="menu-item entry" href="/portal/relatorios"><span class="material-icons">insert_chart</span><span class="menu-text menu-route-text">Relatórios</span></a>
+                    <a class="menu-item entry" href="/portal/romaneio"><span class="material-icons">assignment</span><span class="menu-text menu-route-text">Romaneio</span></a>
+                    <div class="menu-grupo" data-menu-grupo>
+                        <button type="button" class="menu-item entry" data-alternar-submenu aria-expanded="false">
+                            <span class="material-icons">engineering</span><span class="menu-text menu-route-text">Serviços</span><span class="material-icons menu-seta">keyboard_arrow_down</span>
+                        </button>
+                        <div class="submenu-container">
+                            <a class="menu-item entry submenu-item" href="/portal/amostragem-solo"><span class="material-icons">terrain</span><span class="menu-text menu-route-text">Amostragem de Solo</span></a>
+                            <a class="menu-item entry submenu-item" href="/portal/armazenagem"><span class="material-icons">inventory_2</span><span class="menu-text menu-route-text">Armazenagem</span></a>
+                        </div>
+                    </div>
+                    <a class="menu-item entry" href="/portal/visita-tecnica"><span class="material-icons">perm_contact_calendar</span><span class="menu-text menu-route-text">Visita Técnica</span></a>
+
+                    <partial name="_MenuCertificacao" />
+
+                    <partial name="_MenuClima" />
+                </div>
+            </div>
+            <hr class="mat-divider" />
+
+            <div class="menu-grupo" data-menu-grupo>
+                <button type="button" class="menu-item entry" data-alternar-submenu aria-expanded="false">
+                    <span class="material-icons">chat</span>
+                    <span class="menu-text menu-group-title">Comunicação</span>
+                    <span class="material-icons menu-seta">keyboard_arrow_down</span>
+                </button>
+                <div class="submenu-container">
+                    <a class="menu-item entry" href="/portal/fale-conosco"><span class="material-icons">contact_mail</span><span class="menu-text menu-route-text">Fale Conosco</span></a>
+                    <a class="menu-item entry" href="/portal/noticias"><span class="material-icons">newspaper</span><span class="menu-text menu-route-text">Notícias</span></a>
+                </div>
+            </div>
+        </nav>
+
+        <main class="pt-conteudo" id="conteudo">
+            @RenderBody()
+        </main>
+    </div>
+
+    <script src="~/js/portal.js" asp-append-version="true"></script>
+    @await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>

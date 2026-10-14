@@ -1,0 +1,131 @@
+<div class="pt-tela">
+  <a class="pt-btn pt-btn--branco" routerLink="/portal/visita-tecnica"><span class="material-icons">arrow_back</span> Voltar</a>
+
+  <section class="pt-card pt-form">
+    <h1 class="pt-form__titulo">{{ editando ? 'Visita nº ' + editando.numero : 'Cadastrar visita' }}</h1>
+
+    <div class="pt-grade pt-grade--3">
+      <label class="pt-campo">Tipo de Visita:
+        <select class="pt-input" [(ngModel)]="tipo"><option [ngValue]="null">Selecione</option><option *ngFor="let t of tipos" [ngValue]="t">{{ t }}</option></select>
+      </label>
+    </div>
+    <div class="pt-grade pt-grade--3">
+      <label class="pt-campo"><span><b class="pt-obr">*</b> Cultura:</span>
+        <select class="pt-input" [(ngModel)]="cultura"><option value="">Selecione</option><option *ngFor="let c of culturas">{{ c }}</option></select>
+      </label>
+      <label class="pt-campo"><span><b class="pt-obr">*</b> Cooperado:</span>
+        <select class="pt-input" [(ngModel)]="cooperado" (ngModelChange)="propriedade = ''"><option value="">Selecione</option><option *ngFor="let c of cooperados">{{ c.nome }}</option></select>
+      </label>
+      <label class="pt-campo"><span><b class="pt-obr">*</b> Propriedade:</span>
+        <select class="pt-input" [(ngModel)]="propriedade" [disabled]="!cooperado"><option value="">Selecione</option><option *ngFor="let p of propriedades()">{{ p }}</option></select>
+      </label>
+      <label class="pt-campo"><span><b class="pt-obr">*</b> Data da visita :</span>
+        <input class="pt-input" type="date" [(ngModel)]="data" />
+      </label>
+      <label class="pt-campo"><span><b class="pt-obr">*</b> Técnico Responsável:</span>
+        <select class="pt-input" [(ngModel)]="tecnico"><option value="">Selecione</option><option *ngFor="let t of tecnicos">{{ t }}</option></select>
+      </label>
+      <label class="pt-campo"><span><b class="pt-obr">*</b> Descrição:</span>
+        <input class="pt-input" placeholder="Digite" maxlength="200" [(ngModel)]="descricao" />
+      </label>
+    </div>
+
+    <div class="pt-campo">
+      <span><b class="pt-obr">*</b> Detalhes da visita:</span>
+      <div class="pt-editor__barra" role="toolbar" aria-label="Formatação">
+        <button type="button" title="Negrito" (mousedown)="formatar($event, 'bold')"><span class="material-icons">format_bold</span></button>
+        <button type="button" title="Itálico" (mousedown)="formatar($event, 'italic')"><span class="material-icons">format_italic</span></button>
+        <button type="button" title="Sublinhado" (mousedown)="formatar($event, 'underline')"><span class="material-icons">format_underlined</span></button>
+        <label title="Cor do texto"><span class="material-icons">format_color_text</span><input type="color" value="#c62828" (mousedown)="guardarSelecao()" (change)="cor('foreColor', $event)" /></label>
+        <label title="Cor de fundo"><span class="material-icons">format_color_fill</span><input type="color" value="#fff59d" (mousedown)="guardarSelecao()" (change)="cor('hiliteColor', $event)" /></label>
+      </div>
+      <div #editor class="pt-editor" contenteditable="true" data-placeholder="Digite" (input)="detalhes = editor.innerHTML" role="textbox" aria-multiline="true" aria-label="Detalhes da visita"></div>
+    </div>
+
+    <section class="pt-bloco">
+      <h2>Recomendações:</h2>
+      <div class="pt-bloco__acoes">
+        <button type="button" class="pt-link" (click)="novaRecomendacao()"><span class="material-icons">add</span> Nova recomendação</button>
+        <button type="button" class="pt-btn pt-btn--cinza pt-btn--baixo" [disabled]="!ultimas().length" (click)="usarUltimas()"
+                title="Copia as recomendações das últimas visitas deste cooperado nesta propriedade">
+          <span class="material-icons">history</span> Últimas recomendações
+        </button>
+      </div>
+      <div class="pt-tabela-rolagem">
+        <table class="pt-tabela">
+          <thead><tr><th>Ações</th><th>Plantio</th><th>Produto</th><th>Unidade de Medida</th><th>Recomendação (Dose)</th><th>Área aplicada (há)</th><th>Volume Total</th><th>Data da aplicação</th><th>Observação</th></tr></thead>
+          <tbody>
+            <tr *ngFor="let r of recomendacoes; let i = index">
+              <td class="pt-nowrap">
+                <button type="button" class="pt-icone" title="Editar" (click)="editarRecomendacao(i)"><span class="material-icons">edit</span></button>
+                <button type="button" class="pt-icone" title="Excluir" (click)="recomendacoes.splice(i, 1)"><span class="material-icons">delete_outline</span></button>
+              </td>
+              <td>{{ r.plantio }}</td><td>{{ r.produto }}</td><td>{{ r.unidade }}</td><td>{{ num(r.dose) }}</td><td>{{ num(r.areaHa) }}</td>
+              <td>{{ num(r.volumeTotal) }}</td><td>{{ dataBr(r.dataAplicacao) }}</td><td>{{ r.observacao || '-' }}</td>
+            </tr>
+            <tr *ngIf="!recomendacoes.length"><td colspan="9" class="pt-vazio">Não há dados para exibir no momento.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="pt-paginacao">
+        <span>Itens por página</span>
+        <select class="pt-input pt-input--curto" disabled><option>10</option></select>
+        <span class="pt-paginacao__info">{{ recomendacoes.length ? 'Página: 1 de 1' : 'Sem resultados' }}</span>
+        <button type="button" class="pt-icone" disabled><span class="material-icons">first_page</span></button>
+        <button type="button" class="pt-icone" disabled><span class="material-icons">chevron_left</span></button>
+        <button type="button" class="pt-icone" disabled><span class="material-icons">chevron_right</span></button>
+        <button type="button" class="pt-icone" disabled><span class="material-icons">last_page</span></button>
+      </div>
+    </section>
+
+    <section class="pt-bloco">
+      <h2>Arquivos:</h2>
+      <label class="pt-link"><span class="material-icons">add</span> Novo arquivo
+        <input type="file" multiple hidden (change)="adicionarArquivos($event)" />
+      </label>
+      <ul class="pt-arquivos" *ngIf="arquivos.length">
+        <li *ngFor="let a of arquivos; let i = index">
+          <span class="material-icons">description</span>
+          <a [href]="a.url" target="_blank" rel="noopener">{{ a.nome }}</a> <small>({{ tamanho(a.tamanho) }})</small>
+          <button type="button" class="pt-icone" title="Remover" (click)="arquivos.splice(i, 1)"><span class="material-icons">close</span></button>
+        </li>
+      </ul>
+    </section>
+  </section>
+
+  <section class="pt-card pt-auditoria">
+    <div><b>Data de Criação:</b> {{ editando ? dataHoraBr(editando.criadoEm) : '-' }}</div>
+    <div><b>Data de Alteração:</b> {{ editando ? dataHoraBr(editando.alteradoEm) : '-' }}</div>
+    <div><b>Criado por:</b> {{ editando?.criadoPor || '-' }}</div>
+    <div><b>Alterado por:</b> {{ editando?.alteradoPor || '-' }}</div>
+  </section>
+
+  <div class="pt-rodape-acoes">
+    <a class="pt-btn pt-btn--branco" routerLink="/portal/visita-tecnica"><span class="material-icons">close</span> Cancelar</a>
+    <button type="button" class="pt-btn pt-btn--verde" [disabled]="!valido()" (click)="salvar()">
+      <span class="material-icons">check_circle_outline</span> {{ editando ? 'Salvar alterações' : 'Cadastrar visita' }}
+    </button>
+  </div>
+</div>
+
+<div class="pt-modal-fundo" *ngIf="rec" (click)="rec = null">
+  <div class="pt-modal" role="dialog" aria-label="Recomendação" (click)="$event.stopPropagation()">
+    <h2>{{ recIndice === null ? 'Nova recomendação' : 'Editar recomendação' }}</h2>
+    <div class="pt-grade pt-grade--2">
+      <label class="pt-campo"><span><b class="pt-obr">*</b> Plantio:</span><input class="pt-input" placeholder="Ex.: Talhão 3" [(ngModel)]="rec.plantio" /></label>
+      <label class="pt-campo"><span><b class="pt-obr">*</b> Produto:</span><input class="pt-input" placeholder="Digite" [(ngModel)]="rec.produto" /></label>
+      <label class="pt-campo"><span><b class="pt-obr">*</b> Unidade de Medida:</span>
+        <select class="pt-input" [(ngModel)]="rec.unidade"><option value="">Selecione</option><option *ngFor="let u of unidades">{{ u }}</option></select>
+      </label>
+      <label class="pt-campo"><span><b class="pt-obr">*</b> Recomendação (Dose):</span><input class="pt-input" type="number" min="0" step="0.01" [(ngModel)]="rec.dose" (ngModelChange)="calcularVolume()" /></label>
+      <label class="pt-campo">Área aplicada (há):<input class="pt-input" type="number" min="0" step="0.01" [(ngModel)]="rec.areaHa" (ngModelChange)="calcularVolume()" /></label>
+      <label class="pt-campo">Volume Total:<input class="pt-input" type="number" [(ngModel)]="rec.volumeTotal" /></label>
+      <label class="pt-campo">Data da aplicação:<input class="pt-input" type="date" [(ngModel)]="rec.dataAplicacao" /></label>
+      <label class="pt-campo">Observação:<input class="pt-input" [(ngModel)]="rec.observacao" /></label>
+    </div>
+    <div class="pt-modal__acoes">
+      <button type="button" class="pt-btn pt-btn--branco" (click)="rec = null">Cancelar</button>
+      <button type="button" class="pt-btn pt-btn--verde" [disabled]="!rec.plantio || !rec.produto || !rec.unidade || rec.dose === null" (click)="confirmarRecomendacao()">Salvar</button>
+    </div>
+  </div>
+</div>

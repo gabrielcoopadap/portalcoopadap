@@ -1,0 +1,89 @@
+<div class="cm-topo">
+  <div>
+    <p class="cm-eyebrow">Painel de Controle</p>
+    <h1 class="cm-titulo"><span class="material-icons" aria-hidden="true">dashboard</span> Gestão de Certificações</h1>
+    <p class="cm-subtitulo">Cooperativa Agropecuária do Alto Paranaíba — COOPADAP</p>
+  </div>
+  <div class="cm-acoes">
+    <a class="cm-btn cm-btn--contorno" [routerLink]="'vistorias' | acRota"><span class="material-icons" aria-hidden="true">fact_check</span> Vistorias</a>
+    <a class="cm-btn cm-btn--primario" [routerLink]="'certificacoes' | acRota"><span class="material-icons" aria-hidden="true">workspace_premium</span> Certificações ativas</a>
+  </div>
+</div>
+
+<ac-estado [carregando]="!dados && !erro" [erro]="erro" (tentarDeNovo)="carregar()"></ac-estado>
+
+<ng-container *ngIf="dados as d">
+  <section class="cm-indicadores">
+    <div *ngFor="let i of d.indicadores" class="cm-card cm-indicador">
+      <div class="cm-indicador__topo"><span>{{ i.rotulo }}</span><span class="material-icons" aria-hidden="true" [style.color]="i.cor">{{ icone(i.icone) }}</span></div>
+      <div class="cm-indicador__valor" [style.color]="i.cor">{{ i.valor }}</div>
+      <div class="cm-indicador__sub">{{ i.sub }}</div>
+    </div>
+  </section>
+
+  <section class="cm-grade">
+    <article *ngFor="let c of d.certificacoes" class="cm-card cm-cert" tabindex="0" style="cursor:pointer"
+             (click)="abrir(c)" (keydown.enter)="$event.target === $event.currentTarget && abrir(c)">
+      <div class="cm-cert__topo">
+        <span class="cm-avatar" [style.background]="c.cor">{{ c.sigla }}</span>
+        <div class="cm-cert__id">
+          <div class="cm-cert__nome">{{ c.nome }}</div>
+          <div class="cm-cert__escopo" [title]="c.escopo ?? ''">{{ c.escopo }}</div>
+        </div>
+        <ac-pilula [texto]="c.status" [estilo]="R.estiloStatusCertificacao(c.status)"></ac-pilula>
+      </div>
+      <div>
+        <div class="cm-barra-topo"><span>Conformidade geral</span><b [style.color]="c.cor">{{ c.conformidade ?? 0 }}%</b></div>
+        <div class="cm-barra"><div class="cm-barra__fill" [style.width.%]="limitar(c.conformidade ?? 0)" [style.background]="c.cor"></div></div>
+      </div>
+      <div class="cm-metricas">
+        <span style="color:#1f8a4c"><span class="material-icons" aria-hidden="true">check_circle</span> {{ c.conformes ?? 0 }} conformes</span>
+        <span style="color:#c98a1a"><span class="material-icons" aria-hidden="true">pending</span> {{ c.pendentes ?? 0 }} pendentes</span>
+        <span style="color:#c0392b"><span class="material-icons" aria-hidden="true">cancel</span> {{ c.naoConformes ?? 0 }} NCs</span>
+      </div>
+      <div class="cm-rodape-card">
+        <span>Próxima auditoria: <b style="color:var(--cm-texto)">{{ F.data(c.proximaAuditoria) }}</b></span>
+        <span>{{ c.organismo }}</span>
+      </div>
+    </article>
+  </section>
+  <div *ngIf="d.certificacoes.length === 0" class="cm-vazio">Nenhuma certificação cadastrada. <a [routerLink]="'certificacoes' | acRota">Cadastrar a primeira</a>.</div>
+
+  <section class="cm-painel-grid">
+    <div class="cm-card cm-card--pad">
+      <div class="cm-card__cab">
+        <h2 class="cm-card__titulo" style="margin:0"><span class="material-icons" aria-hidden="true">priority_high</span> Ações Prioritárias</h2>
+        <a [routerLink]="'requisitos' | acRota" [queryParams]="{ status: 'Pendente' }">Ver todas →</a>
+      </div>
+      <p *ngIf="d.acoesPrioritarias.length === 0" class="cm-ajuda">Nenhuma ação pendente no momento.</p>
+      <div *ngFor="let r of d.acoesPrioritarias" class="cm-lista-item">
+        <div class="cm-lista-item__l1">
+          <span class="cm-lista-item__titulo"><ac-pilula [texto]="maiusculas(r.prioridade)" [estilo]="R.estiloPrioridade(r.prioridade)"></ac-pilula> {{ r.titulo }}</span>
+          <span class="cm-lista-item__data">{{ F.dataCurta(r.prazo) }}</span>
+        </div>
+        <div class="cm-lista-item__l2">
+          <span>{{ referencia(r) }}</span>
+          <span>Resp. {{ vazio(r.responsavel) }}</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="cm-card cm-card--pad">
+      <div class="cm-card__cab">
+        <h2 class="cm-card__titulo" style="margin:0"><span class="material-icons" aria-hidden="true">fact_check</span> Pendências de Vistoria</h2>
+        <a [routerLink]="['vistorias', 'pendencias'] | acRota">Ver todas →</a>
+      </div>
+      <p *ngIf="d.pendenciasVistoria.length === 0" class="cm-ajuda">Nenhuma pendência de vistoria em aberto.</p>
+      <div *ngFor="let a of d.pendenciasVistoria" class="cm-lista-item">
+        <div class="cm-lista-item__l1">
+          <span class="cm-lista-item__titulo"><ac-pilula [texto]="R.rotuloGrauRisco(a.grauRisco)" [estilo]="R.estiloGrauRisco(a.grauRisco)"></ac-pilula> {{ a.anomalia }}</span>
+          <span class="cm-lista-item__data" [class.cm-t-vermelho]="(a.diasRestantes ?? 0) < 0">{{ F.dataCurta(a.prazo) }}</span>
+        </div>
+        <div class="cm-lista-item__l2">
+          <span>{{ a.vistoriaCodigoDocumento }} — {{ a.vistoriaUnidade }}</span>
+          <span>Resp. {{ vazio(a.responsavelExecucao) }}</span>
+        </div>
+      </div>
+    </div>
+  </section>
+</ng-container>

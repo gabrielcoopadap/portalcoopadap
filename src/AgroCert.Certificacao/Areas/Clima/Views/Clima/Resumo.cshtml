@@ -1,0 +1,108 @@
+@model ResumoClimaTela?
+@{
+    ViewData["Title"] = "Clima · Resumo";
+    var r = Model;
+    var ultimo = r?.Situacao.UltimoMes;
+    var maxBarra = r is null || r.Meses.Count == 0 ? 1 : r.Meses.Max(m => Math.Max(m.ChuvaMm, m.ChuvaNormalMm));
+
+    (string Classe, string Icone, string Texto) Chuva(NivelChuva n) => n switch
+    {
+        NivelChuva.Menos => ("cl-nivel--seco", "wb_sunny", "Menos chuva que o normal"),
+        NivelChuva.Mais => ("cl-nivel--chuva", "thunderstorm", "Mais chuva que o normal"),
+        _ => ("cl-nivel--ok", "check_circle", "Chuva normal"),
+    };
+    (string Classe, string Icone, string Texto) Calor(NivelCalor n) => n switch
+    {
+        NivelCalor.MaisQuente => ("cl-nivel--quente", "local_fire_department", "Mais quente que o normal"),
+        NivelCalor.MaisFrio => ("cl-nivel--frio", "ac_unit", "Mais frio que o normal"),
+        _ => ("cl-nivel--ok", "check_circle", "Temperatura normal"),
+    };
+    string Mm(double v) => Math.Round(v / 5) * 5 < 5 ? N(v, 0) : N(Math.Round(v / 5) * 5, 0);
+}
+<div class="cert-modulo clima-modulo cl-simples">
+    <partial name="_RecursosClima" />
+
+    @if (r is not null)
+    {
+        <section class="cm-card cl-sit @r.ClasseSituacao">
+            <span class="cl-sit__icone">@Html.Icone(r.IconeSituacao)</span>
+            <div class="cl-sit__texto">
+                <p class="cl-sit__rotulo">Como está o clima agora</p>
+                <h2>@r.Titulo</h2>
+                <p>@r.Explicacao</p>
+                @if (r.EfeitoNaRegiao is not null)
+                {
+                    <p class="cl-sit__regiao">@Html.Icone("agriculture") <span>@r.EfeitoNaRegiao</span></p>
+                }
+                <details class="cl-sit__oque">
+                    <summary>@Html.Icone("help_outline") O que é El Niño e La Niña?</summary>
+                    <p><b>El Niño</b> é quando as águas do Oceano Pacífico ficam mais quentes que o normal. <b>La Niña</b> é quando ficam mais frias.
+                       Isso muda o caminho das chuvas e a temperatura em várias partes do Brasil — por isso vale acompanhar antes de planejar a safra.</p>
+                </details>
+            </div>
+        </section>
+
+        <div class="cl-secao">
+            <h2>Os próximos @r.Meses.Count meses</h2>
+            <button type="button" class="cm-btn cm-btn--contorno cl-imprimir" onclick="window.print()">@Html.Icone("print") Imprimir</button>
+        </div>
+        <p class="cl-secao__sub">Comparado com o <b>normal</b> de cada mês (a média dos anos anteriores aqui na região).</p>
+
+        <div class="cl-meses">
+            @foreach (var m in r.Meses)
+            {
+                var ch = Chuva(m.Chuva);
+                var ca = Calor(m.Calor);
+                <article class="cm-card cl-mes cl-mes--@m.Chuva.ToString().ToLowerInvariant()">
+                    <header class="cl-mes__cab">
+                        <div>
+                            <h3>@NomeMes(m.Mes)</h3>
+                            <span class="cl-mes__ano">@m.Ano</span>
+                        </div>
+                        <span class="cl-mes__icone">@Html.Icone(m.Icone)</span>
+                    </header>
+                    <ul class="cl-mes__niveis">
+                        <li class="cl-nivel @ch.Classe">@Html.Icone(ch.Icone) @ch.Texto</li>
+                        <li class="cl-nivel @ca.Classe">@Html.Icone(ca.Icone) @ca.Texto</li>
+                    </ul>
+                    <dl class="cl-mes__numeros">
+                        <div><dt>Chuva esperada</dt><dd>cerca de <b>@Mm(m.ChuvaMm) mm</b></dd></div>
+                        <div><dt>Chuva normal</dt><dd>@Mm(m.ChuvaNormalMm) mm</dd></div>
+                        <div><dt>Temperatura</dt><dd>de <b>@N(m.Minima, 0)°</b> a <b>@N(m.Maxima, 0)°</b></dd></div>
+                    </dl>
+                    @foreach (var (alto, texto) in m.Alertas)
+                    {
+                        <p class="cl-mes__alerta @(alto ? "is-alto" : "")">@Html.Icone(alto ? "error" : "warning") <span><b>@(alto ? "Atenção:" : "Fique de olho:")</b> @texto</span></p>
+                    }
+                </article>
+            }
+        </div>
+
+        <section class="cm-card cl-card cl-barras-card">
+            <h2>Chuva esperada e chuva normal</h2>
+            <div class="cl-barras-leg">
+                <span><i class="cl-barra cl-barra--esperada"></i> Chuva esperada</span>
+                <span><i class="cl-barra cl-barra--normal"></i> Chuva normal do mês</span>
+            </div>
+            <div class="cl-barras" role="table" aria-label="Chuva esperada e chuva normal por mês">
+                @foreach (var m in r.Meses)
+                {
+                    <div class="cl-barras__linha" role="row">
+                        <span class="cl-barras__mes" role="rowheader">@NomeMes(m.Mes)</span>
+                        <div class="cl-barras__par" role="cell">
+                            <div class="cl-barras__faixa"><i class="cl-barra cl-barra--esperada" style="width:@F(Math.Max(0.5, m.ChuvaMm / maxBarra * 100))%"></i><b>@Mm(m.ChuvaMm) mm</b></div>
+                            <div class="cl-barras__faixa"><i class="cl-barra cl-barra--normal" style="width:@F(Math.Max(0.5, m.ChuvaNormalMm / maxBarra * 100))%"></i><span>@Mm(m.ChuvaNormalMm) mm</span></div>
+                        </div>
+                    </div>
+                }
+            </div>
+            <p class="cl-simples__nota">@Html.Icone("info") Os valores são estimativas. A chuva de cada mês costuma variar para mais ou para menos — use como orientação, junto com a previsão do tempo da semana.</p>
+        </section>
+
+        <p class="cl-simples__rodape">
+            Dados da estação até <b>@(ultimo is null ? "-" : $"{NomeMes(ultimo.Mes).ToLowerInvariant()} de {ultimo.Ano}")</b>.
+            Quer ver todos os números? Abra <a href="/clima/previsao">Previsão detalhada</a>.
+        </p>
+    }
+</div>
+<partial name="_ScriptsClima" />

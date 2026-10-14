@@ -1,0 +1,121 @@
+<a class="cm-voltar" [routerLink]="'fauna-flora' | acRota"><span class="material-icons" aria-hidden="true">arrow_back</span> Fauna e Flora</a>
+
+<div class="cm-topo">
+  <div>
+    <h1 class="cm-titulo"><span class="material-icons" aria-hidden="true">menu_book</span> Catálogo de espécies</h1>
+    <p class="cm-subtitulo" *ngIf="especies">{{ cartoes.length }} espécie(s) exibida(s) — fauna e flora registradas nas propriedades</p>
+  </div>
+  <div class="cm-acoes">
+    <button type="button" class="cm-btn cm-btn--contorno" (click)="modalRegistro.abrir()"><span class="material-icons" aria-hidden="true">add_a_photo</span> Novo registro</button>
+    <button type="button" class="cm-btn cm-btn--primario" (click)="novaEspecie()"><span class="material-icons" aria-hidden="true">add</span> Nova espécie</button>
+  </div>
+</div>
+
+<form class="cm-card cm-filtros" [class.is-fechado]="filtrosFechados" (ngSubmit)="filtrar()">
+  <div class="cm-filtros__topo">
+    <span class="cm-filtros__rotulo">Filtros</span>
+    <button type="button" class="cm-filtros__alternar" (click)="filtrosFechados = !filtrosFechados">
+      <span class="material-icons" aria-hidden="true">{{ filtrosFechados ? 'expand_more' : 'expand_less' }}</span><span class="rot">{{ filtrosFechados ? 'Mostrar filtros' : 'Esconder filtros' }}</span>
+    </button>
+  </div>
+  <div class="cm-filtros__corpo">
+    <div class="cm-campo">
+      <label for="fe-busca">Buscar</label>
+      <div class="cm-busca"><span class="material-icons" aria-hidden="true">search</span><input id="fe-busca" class="cm-input" name="busca" [(ngModel)]="filtro.busca" placeholder="Nome popular ou científico" /></div>
+    </div>
+    <div class="cm-campo">
+      <label for="fe-reino">Fauna / Flora</label>
+      <select id="fe-reino" class="cm-select" name="reino" [(ngModel)]="filtro.reino">
+        <option value="">Todas</option>
+        <option value="FAUNA">Fauna</option>
+        <option value="FLORA">Flora</option>
+      </select>
+    </div>
+    <div class="cm-campo">
+      <label for="fe-grupo">Grupo</label>
+      <select id="fe-grupo" class="cm-select" name="grupo" [(ngModel)]="filtro.grupo">
+        <option value="">Todos os grupos</option>
+        <option *ngFor="let g of nomesGrupos" [value]="g">{{ g }}</option>
+      </select>
+    </div>
+    <div class="cm-campo">
+      <label for="fe-status">Conservação</label>
+      <select id="fe-status" class="cm-select" name="status" [(ngModel)]="filtro.status">
+        <option value="">Todas</option>
+        <option value="AMEACADA">Ameaçadas (VU, EN, CR)</option>
+        <option *ngFor="let s of statusConservacao" [value]="s.codigo">{{ s.rotulo }}</option>
+      </select>
+    </div>
+    <div class="cm-filtros__botoes">
+      <a *ngIf="temFiltros" class="cm-btn cm-btn--contorno" [routerLink]="'fauna-flora/especies' | acRota">Limpar</a>
+      <button type="submit" class="cm-btn cm-btn--primario"><span class="material-icons" aria-hidden="true">filter_alt</span> Filtrar</button>
+    </div>
+  </div>
+</form>
+
+<ac-estado [carregando]="!especies && !erro" [erro]="erro" (tentarDeNovo)="carregar()"></ac-estado>
+
+<ng-container *ngIf="especies">
+  <div class="cm-vazio" *ngIf="cartoes.length === 0">Nenhuma espécie encontrada.</div>
+  <div class="ff-catalogo">
+    <article *ngFor="let c of cartoes; trackBy: porId" class="cm-card ff-especie" tabindex="0" title="Clique para editar"
+             (click)="editar(c.e, $event)" (keydown.enter)="editar(c.e, $event)">
+      <div acFfFoto [url]="c.e.fotoUrl" [grupo]="c.g" [alt]="c.e.nomePopular"></div>
+      <div class="ff-especie__corpo">
+        <div class="ff-especie__nome">{{ c.e.nomePopular }}</div>
+        <div class="ff-especie__cient">{{ c.e.nomeCientifico }}</div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:2px">
+          <ac-pilula [texto]="c.pilulaGrupo.texto" [estilo]="c.pilulaGrupo.estilo"></ac-pilula>
+          <ac-pilula *ngIf="c.pilulaStatus" [texto]="c.pilulaStatus.texto" [estilo]="c.pilulaStatus.estilo"></ac-pilula>
+        </div>
+        <div class="ff-especie__rodape">
+          <a [routerLink]="'fauna-flora/registros' | acRota" [queryParams]="{ especieId: c.e.id }">{{ c.total }} registro(s)</a>
+          <span>{{ c.ultimo ? 'último em ' + c.ultimo : 'sem registros' }}</span>
+        </div>
+      </div>
+    </article>
+  </div>
+</ng-container>
+
+<ac-modal [aberto]="modalEspecie" [titulo]="editandoId === null ? 'Nova espécie' : 'Editar espécie'" (fechar)="modalEspecie = false">
+  <form ngNativeValidate (ngSubmit)="salvarEspecie()">
+    <div class="cm-modal__corpo">
+      <div class="cm-linha">
+        <div class="cm-campo"><label for="es-pop">Nome popular *</label><input id="es-pop" class="cm-input" name="NomePopular" required placeholder="Ex: Lobo-guará" [(ngModel)]="form.nomePopular" /></div>
+        <div class="cm-campo"><label for="es-cie">Nome científico</label><input id="es-cie" class="cm-input" name="NomeCientifico" placeholder="Ex: Chrysocyon brachyurus" style="font-style:italic" [(ngModel)]="form.nomeCientifico" /></div>
+      </div>
+      <div class="cm-linha cm-linha--3">
+        <div class="cm-campo">
+          <label for="es-reino">Fauna / Flora *</label>
+          <select id="es-reino" class="cm-select" name="Reino" [(ngModel)]="form.reino" (ngModelChange)="trocarReino()">
+            <option value="FAUNA">Fauna</option>
+            <option value="FLORA">Flora</option>
+          </select>
+        </div>
+        <div class="cm-campo">
+          <label for="es-grupo">Grupo</label>
+          <select id="es-grupo" class="cm-select" name="Grupo" [(ngModel)]="form.grupo">
+            <option *ngFor="let g of gruposDoReino" [value]="g.nome">{{ g.nome }}</option>
+          </select>
+        </div>
+        <div class="cm-campo">
+          <label for="es-status">Conservação</label>
+          <select id="es-status" class="cm-select" name="StatusConservacao" [(ngModel)]="form.statusConservacao">
+            <option *ngFor="let s of statusConservacao" [value]="s.codigo">{{ s.rotulo }} ({{ s.codigo }})</option>
+          </select>
+        </div>
+      </div>
+      <div class="cm-campo"><label for="es-desc">Descrição</label><textarea id="es-desc" class="cm-textarea" name="Descricao" placeholder="Onde ocorre, hábitos, importância..." [(ngModel)]="form.descricao"></textarea></div>
+      <div class="cm-campo"><label for="es-foto">Foto</label><input #fotoEspecie id="es-foto" type="file" accept="image/*" class="cm-input" name="Foto" (change)="arquivo = fotoEspecie.files?.[0] ?? null" /><span class="cm-ajuda">Use fotos próprias ou com licença de uso.</span></div>
+    </div>
+    <div class="cm-modal__acoes cm-modal__acoes--entre">
+      <button type="button" class="cm-btn cm-btn--perigo" [hidden]="editandoId === null" [disabled]="salvando" (click)="excluirEspecie()"><span class="material-icons" aria-hidden="true">delete_outline</span> Excluir</button>
+      <div class="cm-acoes">
+        <button type="button" class="cm-btn cm-btn--contorno" (click)="modalEspecie = false">Cancelar</button>
+        <button type="submit" class="cm-btn cm-btn--primario" [class.is-carregando]="salvando" [disabled]="salvando">{{ salvando ? 'Salvando...' : 'Salvar' }}</button>
+      </div>
+    </div>
+  </form>
+</ac-modal>
+
+<ac-ff-modal-registro #modalRegistro [especies]="especies ?? []" [propriedades]="propriedades" (salvo)="carregar()"></ac-ff-modal-registro>

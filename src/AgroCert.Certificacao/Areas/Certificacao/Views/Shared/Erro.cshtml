@@ -1,0 +1,8 @@
+@{
+    ViewData["Title"] = "Certificação";
+}
+<div class="cert-modulo">
+    <partial name="_Recursos" />
+    <a class="cm-voltar" href="javascript:history.back()">@Html.Icone("arrow_back") Voltar</a>
+    <div class="cm-alerta cm-alerta--erro" role="alert">@Html.Icone("error_outline")<div>@ViewData["Mensagem"]</div></div>
+</div>

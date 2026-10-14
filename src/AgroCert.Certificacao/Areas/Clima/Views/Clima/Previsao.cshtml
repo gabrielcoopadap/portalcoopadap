@@ -1,0 +1,336 @@
+@model PrevisaoAnoDto?
+@{
+    ViewData["Title"] = "Clima · Previsão do ano";
+    var p = ViewData["Parametros"] as ParametrosPrevisao ?? new ParametrosPrevisao(DateTime.Today.Year, null, 60, 0.5, 80);
+    var m = Model;
+    var meses = m?.Meses ?? new List<PrevisaoMesDto>();
+
+    static double Passo(double max, int n = 4)
+    {
+        var bruto = Math.Max(max, 1e-9) / n;
+        var pot = Math.Pow(10, Math.Floor(Math.Log10(bruto)));
+        foreach (var f in new[] { 1, 2, 2.5, 5, 10 }) if (f * pot >= bruto) return f * pot;
+        return 10 * pot;
+    }
+
+    const double W = 760, H = 262, mE = 44, mD = 12, mT = 12, mB = 62;
+    var larg = (W - mE - mD) / 12;
+    double X(int mes) => mE + larg * (mes - 1) + larg / 2;
+    var maxChuva = meses.Count == 0 ? 100 : meses.Max(x => Math.Max(Math.Max(x.Chuva.Max, x.Chuva.Normal), x.Chuva.Observado ?? 0));
+    var passoC = Passo(maxChuva);
+    var topoC = passoC * Math.Ceiling(maxChuva / passoC);
+    double YC(double v) => mT + (H - mT - mB) * (1 - v / topoC);
+    var baseC = YC(0);
+
+    const double HT = 230, mBT = 26;
+    var tMin = meses.Count == 0 ? 0 : meses.Min(x => Math.Min(x.Minima.Min, x.Minima.Normal));
+    var tMax = meses.Count == 0 ? 30 : meses.Max(x => Math.Max(x.Maxima.Max, x.Maxima.Normal));
+    var passoT = Passo(tMax - tMin, 6);
+    var yT0 = passoT * Math.Floor((tMin - 0.5) / passoT);
+    var yT1 = passoT * Math.Ceiling((tMax + 0.5) / passoT);
+    double YT(double v) => mT + (HT - mT - mBT) * (1 - (v - yT0) / (yT1 - yT0));
+    string Linha(Func<PrevisaoMesDto, double> sel) => string.Join(" ", meses.Select(x => $"{F(X(x.Mes))},{F(YT(sel(x)))}"));
+    string Faixa(Func<PrevisaoMesDto, FaixaDto> sel) =>
+        string.Join(" ", meses.Select(x => $"{F(X(x.Mes))},{F(YT(sel(x).Max))}")) + " " +
+        string.Join(" ", meses.AsEnumerable().Reverse().Select(x => $"{F(X(x.Mes))},{F(YT(sel(x).Min))}"));
+
+    string BarraArredondada(double x, double y0, double y1, double w)
+    {
+        var h = y0 - y1;
+        if (h <= 0.5) return "";
+        var r = Math.Min(4, Math.Min(w / 2, h));
+        return $"M{F(x)},{F(y0)} V{F(y1 + r)} Q{F(x)},{F(y1)} {F(x + r)},{F(y1)} H{F(x + w - r)} Q{F(x + w)},{F(y1)} {F(x + w)},{F(y1 + r)} V{F(y0)} Z";
+    }
+
+    var chuvaAno = meses.Sum(x => x.Chuva.Valor);
+    var normalAno = meses.Sum(x => x.Chuva.Normal);
+    var riscos = meses.SelectMany(x => x.Riscos.Select(r => (Mes: x, Risco: r)))
+                      .OrderByDescending(x => x.Risco.Nivel == "ALTO").ThenBy(x => x.Mes.Mes).ToList();
+    var altos = riscos.Count(r => r.Risco.Nivel == "ALTO");
+    var nivelTxt = m is null ? p.Nivel + "%" : Math.Round(m.NivelIntervalo * 100) + "%";
+}
+<div class="cert-modulo clima-modulo">
+    <partial name="_RecursosClima" />
+
+    <form class="cm-card cl-filtros" method="get" action="/clima/previsao">
+        <div class="cm-campo">
+            <label for="cl-ano">Ano</label>
+            <input id="cl-ano" class="cm-input" type="number" name="ano" min="1900" max="2200" value="@p.Ano" />
+        </div>
+        <div class="cm-campo cl-filtros__oni">
+            <label for="cl-oni">ONI oficial (opcional)</label>
+            <input id="cl-oni" class="cm-input" type="text" name="oni" value="@p.Oni" placeholder="ex.: 10:1.6, 11:1.8, 12:1.9" />
+        </div>
+        <div class="cm-campo">
+            <label for="cl-ciclo">Ciclo (anos)</label>
+            <input id="cl-ciclo" class="cm-input" type="number" name="ciclo" min="1" max="200" value="@p.Ciclo" />
+        </div>
+        <div class="cm-campo">
+            <label for="cl-peso">Peso do ciclo</label>
+            <select id="cl-peso" class="cm-select" name="pesoCiclo">
+                @foreach (var v in new[] { 0, 0.25, 0.5, 0.75, 1 })
+                {
+                    <option value="@F(v)" selected="@(Math.Abs(v - p.PesoCiclo) < 0.001)">@Pct(v)</option>
+                }
+            </select>
+        </div>
+        <div class="cm-campo">
+            <label for="cl-nivel">Faixa min–máx</label>
+            <select id="cl-nivel" class="cm-select" name="nivel">
+                @foreach (var v in new[] { 80, 90, 95 })
+                {
+                    <option value="@v" selected="@(v == p.Nivel)">@v% dos casos</option>
+                }
+            </select>
+        </div>
+        <button type="submit" class="cm-btn cm-btn--primario">@Html.Icone("refresh") Atualizar</button>
+        <p class="cm-ajuda cl-filtros__ajuda">
+            Sem ONI informado, os meses já medidos usam o valor real e os seguintes são projetados pelo modelo.
+            Para usar a previsão da NOAA/IRI: um valor para o ano todo (<code>1.5</code>), 12 valores de jan a dez
+            (<code>0.8,1.0,…</code>) ou só alguns meses (<code>10:1.6,11:1.8</code>).
+        </p>
+    </form>
+
+    @if (m is not null)
+    {
+        @foreach (var aviso in m.Avisos)
+        {
+            <div class="cm-alerta cm-alerta--info" role="status">@Html.Icone("info")<div>@aviso</div></div>
+        }
+
+        <section class="cm-indicadores">
+            <div class="cm-card cm-indicador">
+                <div class="cm-indicador__topo"><span>ENSO predominante em @m.AnoAlvo</span>@Html.Icone("waves")</div>
+                <div class="cm-indicador__valor"><span class="cl-fase @ClasseFase(m.EnsoAno.FasePredominante)">@NomeFase(m.EnsoAno.FasePredominante)</span></div>
+                <div class="cm-indicador__sub">ONI médio @S(m.EnsoAno.OniMedio) · pico: @(meses.Count == 0 ? "-" : meses.MaxBy(x => Math.Abs(x.Enso.Oni))!.Enso.Descricao)</div>
+            </div>
+            <div class="cm-card cm-indicador">
+                <div class="cm-indicador__topo"><span>Chuva prevista no ano</span>@Html.Icone("water_drop")</div>
+                <div class="cm-indicador__valor">@N(chuvaAno, 0) mm</div>
+                <div class="cm-indicador__sub">Normal @N(normalAno, 0) mm (@(normalAno > 0 ? S((chuvaAno - normalAno) / normalAno * 100, 0) + "%" : "-"))</div>
+            </div>
+            <div class="cm-card cm-indicador">
+                <div class="cm-indicador__topo"><span>Riscos para a lavoura</span>@Html.Icone("report", altos > 0 ? "color:#d03b3b" : null)</div>
+                <div class="cm-indicador__valor">@altos <small class="cl-kpi-unid">alto(s)</small></div>
+                <div class="cm-indicador__sub">@(riscos.Count - altos) de atenção · veja a lista abaixo</div>
+            </div>
+            <div class="cm-card cm-indicador">
+                <div class="cm-indicador__topo"><span>Ciclo de @m.Ciclo anos</span>@Html.Icone("history")</div>
+                <div class="cm-indicador__valor cm-indicador__valor--data">@(m.CicloDisponivel ? m.AnoReferencia.ToString() : "Sem dados")</div>
+                <div class="cm-indicador__sub">@(m.CicloDisponivel ? $"Entra com peso {Pct(m.PesoCiclo)}, sem o ENSO daquele ano" : $"Não há dados de {m.AnoReferencia} na base")</div>
+            </div>
+        </section>
+
+        <p class="cl-resumo">@Html.Icone("insights") @m.Resumo</p>
+
+        <section class="cm-card cl-card">
+            <div class="cl-card__cab">
+                <h2>Chuva por mês — @m.AnoAlvo</h2>
+                <span class="cm-contador">mm · faixa de @nivelTxt dos casos</span>
+            </div>
+            <div class="ff-legenda cl-legenda">
+                <span><i class="cl-leg-barra"></i>Prevista</span>
+                <span><i class="cl-leg-faixa"></i>Faixa min–máx</span>
+                <span><i class="cl-leg-normal"></i>Normal do mês</span>
+                <span><i class="cl-leg-obs"></i>Observado</span>
+                <span class="cl-leg-sep"></span>
+                <span><i class="cl-fase-mini cl-fase--nino"></i>El Niño</span>
+                <span><i class="cl-fase-mini cl-fase--nina"></i>La Niña</span>
+                <span><i class="cl-fase-mini cl-fase--neutro"></i>Neutro</span>
+                <span><i class="cl-fase-mini cl-fase--proj"></i>ONI projetado</span>
+            </div>
+            <svg class="ff-grafico cl-grafico" viewBox="0 0 @F(W) @F(H)" role="img" aria-label="Chuva prevista, faixa e normal por mês em @m.AnoAlvo">
+                @for (var t = 0; t <= (int)Math.Round(topoC / passoC); t++)
+                {
+                    var v = passoC * t;
+                    <line x1="@F(mE)" x2="@F(W - mD)" y1="@F(YC(v))" y2="@F(YC(v))" stroke="@(t == 0 ? "#c3c2b7" : "#ececec")" stroke-width="1" />
+                    @:<text x="@F(mE - 6)" y="@F(YC(v) + 3)" text-anchor="end">@N(v, 0)</text>
+                }
+                @foreach (var x in meses)
+                {
+                    var bw = Math.Min(26, larg * 0.52);
+                    var bx = X(x.Mes) - bw / 2;
+                    <path d="@BarraArredondada(bx, baseC, YC(x.Chuva.Valor), bw)" fill="#2a78d6" />
+                    <line x1="@F(X(x.Mes))" x2="@F(X(x.Mes))" y1="@F(YC(x.Chuva.Max))" y2="@F(YC(x.Chuva.Min))" stroke="#52514e" stroke-width="1.5" />
+                    <line x1="@F(X(x.Mes) - 4)" x2="@F(X(x.Mes) + 4)" y1="@F(YC(x.Chuva.Max))" y2="@F(YC(x.Chuva.Max))" stroke="#52514e" stroke-width="1.5" />
+                    <line x1="@F(X(x.Mes) - 4)" x2="@F(X(x.Mes) + 4)" y1="@F(YC(x.Chuva.Min))" y2="@F(YC(x.Chuva.Min))" stroke="#52514e" stroke-width="1.5" />
+                    <line x1="@F(bx - 5)" x2="@F(bx + bw + 5)" y1="@F(YC(x.Chuva.Normal))" y2="@F(YC(x.Chuva.Normal))" stroke="#0b0b0b" stroke-width="2.5" stroke-linecap="round" />
+                    @if (x.Chuva.Observado is double obs)
+                    {
+                        <circle cx="@F(X(x.Mes) + bw / 2 + 9)" cy="@F(YC(obs))" r="4.5" fill="#fff" stroke="#0b0b0b" stroke-width="2" />
+                    }
+                    @:<text x="@F(X(x.Mes))" y="@F(baseC + 14)" text-anchor="middle">@MesCurto(x.Mes)</text>
+                    var proj = x.Enso.Origem is "modelo" or "climatologia";
+                    <rect x="@F(X(x.Mes) - 19)" y="@F(baseC + 22)" width="38" height="18" rx="9"
+                          class="cl-fase-svg @ClasseFase(x.Enso.Fase) @(proj ? "cl-fase--proj" : "")" />
+                    @:<text x="@F(X(x.Mes))" y="@F(baseC + 34.5)" text-anchor="middle" class="cl-fase-txt">@S(x.Enso.Oni)</text>
+                }
+                <text x="@F(mE - 6)" y="@F(baseC + 34.5)" text-anchor="end" class="cl-eixo-unid">ONI</text>
+                @foreach (var x in meses)
+                {
+                    var c = x.Chuva;
+                    var dica = $"{NomeMes(x.Mes)}/{x.Ano} · {x.Enso.Descricao}\n" +
+                               $"Prevista: {N(c.Valor, 0)} mm (faixa {N(c.Min, 0)}–{N(c.Max, 0)})\n" +
+                               $"Normal: {N(c.Normal, 0)} mm" + (c.AnomaliaPct is double ap ? $" · {S(ap, 0)}%" : "") + "\n" +
+                               $"Efeito do ENSO: {S(c.EfeitoEnso, 0)} mm" + (c.EfeitoCiclo is double ec ? $" · ciclo: {S(ec, 0)} mm" : "") + "\n" +
+                               (c.Observado is double o ? $"Observado: {N(o, 0)} mm\n" : "") +
+                               $"Chance abaixo / normal / acima: {Pct(c.ProbAbaixoNormal)} / {Pct(c.ProbDentroNormal)} / {Pct(c.ProbAcimaNormal)}";
+                    <g class="ff-hit" data-tip="@dica">
+                        <line x1="@F(X(x.Mes))" x2="@F(X(x.Mes))" y1="@F(mT)" y2="@F(baseC)" stroke="rgba(0,0,0,.25)" stroke-width="1" />
+                        <rect x="@F(X(x.Mes) - larg / 2)" y="0" width="@F(larg)" height="@F(H)" />
+                    </g>
+                }
+            </svg>
+        </section>
+
+        <section class="cm-card cl-card">
+            <div class="cl-card__cab">
+                <h2>Temperaturas máxima e mínima — @m.AnoAlvo</h2>
+                <span class="cm-contador">°C · faixa de @nivelTxt dos casos</span>
+            </div>
+            <div class="ff-legenda cl-legenda">
+                <span><i style="background:#eb6834"></i>Máxima prevista</span>
+                <span><i style="background:#2a78d6"></i>Mínima prevista</span>
+                <span><i class="cl-leg-tracejado"></i>Normal do mês</span>
+                <span><i class="cl-leg-faixa-t"></i>Faixa min–máx</span>
+            </div>
+            <svg class="ff-grafico cl-grafico" viewBox="0 0 @F(W) @F(HT)" role="img" aria-label="Temperaturas máxima e mínima previstas por mês em @m.AnoAlvo">
+                @for (var v = yT0; v <= yT1 + 1e-6; v += passoT)
+                {
+                    <line x1="@F(mE)" x2="@F(W - mD - 30)" y1="@F(YT(v))" y2="@F(YT(v))" stroke="#ececec" stroke-width="1" />
+                    @:<text x="@F(mE - 6)" y="@F(YT(v) + 3)" text-anchor="end">@N(v, 0)</text>
+                }
+                @if (meses.Count > 0)
+                {
+                    <polygon points="@Faixa(x => x.Maxima)" fill="#eb6834" fill-opacity=".13" />
+                    <polygon points="@Faixa(x => x.Minima)" fill="#2a78d6" fill-opacity=".13" />
+                    <polyline points="@Linha(x => x.Maxima.Normal)" fill="none" stroke="#eb6834" stroke-opacity=".75" stroke-width="1.5" stroke-dasharray="4 4" />
+                    <polyline points="@Linha(x => x.Minima.Normal)" fill="none" stroke="#2a78d6" stroke-opacity=".75" stroke-width="1.5" stroke-dasharray="4 4" />
+                    <polyline points="@Linha(x => x.Maxima.Valor)" fill="none" stroke="#eb6834" stroke-width="2" stroke-linejoin="round" />
+                    <polyline points="@Linha(x => x.Minima.Valor)" fill="none" stroke="#2a78d6" stroke-width="2" stroke-linejoin="round" />
+                    var ult = meses[^1];
+                    @:<text x="@F(X(ult.Mes) + 8)" y="@F(YT(ult.Maxima.Valor) + 3)" class="cl-rotulo-direto">Máx.</text>
+                    @:<text x="@F(X(ult.Mes) + 8)" y="@F(YT(ult.Minima.Valor) + 3)" class="cl-rotulo-direto">Mín.</text>
+                }
+                @foreach (var x in meses)
+                {
+                    <circle cx="@F(X(x.Mes))" cy="@F(YT(x.Maxima.Valor))" r="3.5" fill="#eb6834" stroke="#fff" stroke-width="2" />
+                    <circle cx="@F(X(x.Mes))" cy="@F(YT(x.Minima.Valor))" r="3.5" fill="#2a78d6" stroke="#fff" stroke-width="2" />
+                    @:<text x="@F(X(x.Mes))" y="@F(HT - 8)" text-anchor="middle">@MesCurto(x.Mes)</text>
+                }
+                @foreach (var x in meses)
+                {
+                    var dica = $"{NomeMes(x.Mes)}/{x.Ano} · {x.Enso.Descricao}\n" +
+                               $"Máxima: {N(x.Maxima.Valor)} °C (normal {N(x.Maxima.Normal)}, faixa {N(x.Maxima.Min)}–{N(x.Maxima.Max)})\n" +
+                               $"Mínima: {N(x.Minima.Valor)} °C (normal {N(x.Minima.Normal)}, faixa {N(x.Minima.Min)}–{N(x.Minima.Max)})\n" +
+                               $"Efeito do ENSO: máx {S(x.Maxima.EfeitoEnso, 2)} °C · mín {S(x.Minima.EfeitoEnso, 2)} °C" +
+                               (x.Maxima.Observado is double om ? $"\nObservado: máx {N(om)} °C · mín {N(x.Minima.Observado ?? 0)} °C" : "");
+                    <g class="ff-hit" data-tip="@dica">
+                        <line x1="@F(X(x.Mes))" x2="@F(X(x.Mes))" y1="@F(mT)" y2="@F(HT - mBT)" stroke="rgba(0,0,0,.25)" stroke-width="1" />
+                        <rect x="@F(X(x.Mes) - larg / 2)" y="0" width="@F(larg)" height="@F(HT)" />
+                    </g>
+                }
+            </svg>
+        </section>
+
+        <div class="cl-duas">
+            <section class="cm-card cl-card">
+                <div class="cl-card__cab"><h2>Riscos para a lavoura</h2><span class="cm-contador">@riscos.Count aviso(s)</span></div>
+                @if (riscos.Count == 0)
+                {
+                    <div class="cm-vazio">Nenhum mês com chance relevante (≥ 45%) de fugir do normal.</div>
+                }
+                else
+                {
+                    <ul class="cl-riscos">
+                        @foreach (var (mes, r) in riscos)
+                        {
+                            var (icone, rotulo) = Risco(r.Tipo);
+                            <li class="cl-risco cl-risco--@(r.Nivel == "ALTO" ? "alto" : "atencao")">
+                                <span class="cl-risco__icone">@Html.Icone(icone)</span>
+                                <div>
+                                    <div class="cl-risco__cab">
+                                        <b>@NomeMes(mes.Mes) · @rotulo</b>
+                                        <span class="cl-status cl-status--@(r.Nivel == "ALTO" ? "alto" : "atencao")">
+                                            @Html.Icone(r.Nivel == "ALTO" ? "error" : "warning")@(r.Nivel == "ALTO" ? "Alto" : "Atenção") · @Pct(r.Probabilidade)
+                                        </span>
+                                    </div>
+                                    <p>@r.Mensagem</p>
+                                </div>
+                            </li>
+                        }
+                    </ul>
+                }
+            </section>
+
+            <section class="cm-card cl-card">
+                <div class="cl-card__cab"><h2>Anos parecidos</h2><span class="cm-contador">ENSO mais próximo do previsto</span></div>
+                <p class="cm-ajuda">Anos em que o ONI teve trajetória parecida com a prevista para @m.AnoAlvo. Servem de referência para conversar com o produtor.</p>
+                <table class="cm-tabela cl-tabela-compacta">
+                    <thead><tr><th>Ano</th><th>ENSO no ano (pico)</th><th class="cl-num">ONI médio</th><th class="cl-num">Distância</th></tr></thead>
+                    <tbody>
+                        @foreach (var a in m.AnosAnalogos)
+                        {
+                            <tr><td><b>@a.Ano</b></td><td>@a.Descricao</td><td class="cl-num">@S(a.OniMedio, 2)</td><td class="cl-num">@N(a.Distancia, 2)</td></tr>
+                        }
+                    </tbody>
+                </table>
+                <details class="cl-metodo">
+                    <summary>Como a previsão é feita</summary>
+                    <p>@m.Metodo</p>
+                    <p>Margem: @(m.Margem == "usuario" ? "margem de erro cadastrada para o usuário." : "intervalo estatístico calculado pelo modelo.")</p>
+                </details>
+            </section>
+        </div>
+
+        <section class="cm-card cm-tabela-wrap">
+            <div class="cl-card__cab cl-card__cab--pad"><h2>Tabela mês a mês</h2><span class="cm-contador">faixa min–máx de @nivelTxt</span></div>
+            <div class="cm-tabela-scroll">
+                <table class="cm-tabela cl-tabela">
+                    <thead>
+                        <tr>
+                            <th>Mês</th><th>ENSO</th><th class="cl-num">Chuva prevista</th><th class="cl-num">Normal</th><th class="cl-num">Anomalia</th>
+                            <th>Chance: abaixo · normal · acima</th><th class="cl-num">Observado</th>
+                            <th class="cl-num">Máxima</th><th class="cl-num">Mínima</th><th class="cl-num">Umidade</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var x in meses)
+                        {
+                            var c = x.Chuva;
+                            <tr>
+                                <td><b>@NomeMes(x.Mes)</b></td>
+                                <td>
+                                    <span class="cl-fase @ClasseFase(x.Enso.Fase)" title="@RotuloOrigem(x.Enso.Origem)">@NomeFase(x.Enso.Fase) @S(x.Enso.Oni)</span>
+                                    <div class="cm-t-sub">@(x.Enso.Origem == "observado" ? "observado" : x.Enso.Origem == "informado" ? "informado" : $"projetado ±{N(x.Enso.Incerteza)}")</div>
+                                </td>
+                                <td class="cl-num"><b>@N(c.Valor, 0) mm</b><div class="cm-t-sub">@N(c.Min, 0)–@N(c.Max, 0)</div></td>
+                                <td class="cl-num">@N(c.Normal, 0) mm</td>
+                                <td class="cl-num">@(c.AnomaliaPct is double ap ? S(ap, 0) + "%" : S(c.Anomalia, 0) + " mm")</td>
+                                <td>
+                                    <div class="cl-chance" role="img" aria-label="Abaixo @Pct(c.ProbAbaixoNormal), normal @Pct(c.ProbDentroNormal), acima @Pct(c.ProbAcimaNormal)">
+                                        <span class="cl-chance__abaixo" style="flex-grow:@F(c.ProbAbaixoNormal)"></span>
+                                        <span class="cl-chance__normal" style="flex-grow:@F(c.ProbDentroNormal)"></span>
+                                        <span class="cl-chance__acima" style="flex-grow:@F(c.ProbAcimaNormal)"></span>
+                                    </div>
+                                    <div class="cm-t-sub">@Pct(c.ProbAbaixoNormal) · @Pct(c.ProbDentroNormal) · @Pct(c.ProbAcimaNormal)</div>
+                                </td>
+                                <td class="cl-num">@(c.Observado is double o ? N(o, 0) + " mm" : "—")</td>
+                                <td class="cl-num">@N(x.Maxima.Valor) °C<div class="cm-t-sub">normal @N(x.Maxima.Normal)</div></td>
+                                <td class="cl-num">@N(x.Minima.Valor) °C<div class="cm-t-sub">normal @N(x.Minima.Normal)</div></td>
+                                <td class="cl-num">@N(x.UmidadeRelativa.Valor, 0)%<div class="cm-t-sub">normal @N(x.UmidadeRelativa.Normal, 0)%</div></td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+            <p class="cl-rodape">
+                <span class="cl-chance-leg cl-chance__abaixo"></span> abaixo do normal (tercil mais seco)
+                <span class="cl-chance-leg cl-chance__normal"></span> dentro do normal
+                <span class="cl-chance-leg cl-chance__acima"></span> acima do normal (tercil mais chuvoso).
+                Sem ENSO, cada faixa teria 33%.
+            </p>
+        </section>
+    }
+</div>
+<partial name="_ScriptsClima" />

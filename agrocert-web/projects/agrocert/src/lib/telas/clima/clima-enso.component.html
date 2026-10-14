@@ -1,0 +1,93 @@
+<ac-clima-cabecalho aba="enso" [erro]="erro"></ac-clima-cabecalho>
+<ac-estado [carregando]="carregando"></ac-estado>
+<ac-clima-indisponivel *ngIf="indisponivel" [endereco]="endereco" (tentarDeNovo)="carregar()"></ac-clima-indisponivel>
+
+<ng-container *ngIf="s && imp && !indisponivel">
+  <div class="cl-duas cl-duas--enso">
+    <section class="cm-card cl-card cl-situacao">
+      <div class="cl-card__cab"><h2>Situação atual</h2><span class="cm-contador">{{ cf.nomeMes(s.ultimoMes.mes) }}/{{ s.ultimoMes.ano }}</span></div>
+      <div class="cl-situacao__topo">
+        <div class="cl-situacao__oni">
+          <span class="cl-situacao__rot">ONI</span>
+          <span class="cl-situacao__valor">{{ cf.s(s.oni) }}</span>
+        </div>
+        <div>
+          <span [class]="'cl-fase cl-fase--grande ' + cf.classeFase(s.fase)">{{ cf.nomeFase(s.fase) }}{{ s.fase === 'NEUTRO' ? '' : ' ' + s.intensidade.toLowerCase() }}</span>
+          <div class="cl-situacao__linha"><span class="material-icons" aria-hidden="true">{{ s.episodio !== 'NEUTRO' ? 'check_circle' : 'schedule' }}</span>
+            {{ s.episodio !== 'NEUTRO' ? 'Episódio de ' + cf.nomeFase(s.episodio) + ' configurado' : s.fase !== 'NEUTRO' ? 'Em formação — ainda sem 5 trimestres seguidos' : 'Sem episódio em curso' }}
+          </div>
+          <div class="cl-situacao__linha"><span class="material-icons" aria-hidden="true">{{ s.tendencia_3_meses >= 0 ? 'trending_up' : 'trending_down' }}</span>
+            {{ cf.s(s.tendencia_3_meses) }} em 3 meses ({{ s.tendencia_3_meses >= 0.3 ? 'aquecendo' : s.tendencia_3_meses <= -0.3 ? 'esfriando' : 'estável' }})
+          </div>
+        </div>
+      </div>
+      <p class="cl-resumo cl-resumo--card">{{ s.resumo }}</p>
+      <p *ngIf="s.observacao" class="cm-ajuda">{{ s.observacao }}</p>
+    </section>
+
+    <section class="cm-card cl-card">
+      <div class="cl-card__cab"><h2>ONI: últimos 12 meses e projeção</h2><span class="cm-contador">índice do Pacífico (NOAA)</span></div>
+      <div class="ff-legenda cl-legenda">
+        <span><i style="background:#e34948"></i>Acima de zero (lado El Niño)</span>
+        <span><i style="background:#2a78d6"></i>Abaixo de zero (lado La Niña)</span>
+        <span><i class="cl-leg-proj"></i>Projetado (com incerteza)</span>
+        <span><i class="cl-leg-tracejado cl-leg-tracejado--cinza"></i>Limiar ±0,5</span>
+      </div>
+      <svg class="ff-grafico cl-grafico" [attr.viewBox]="'0 0 ' + W + ' ' + H" role="img" aria-label="ONI observado nos últimos 12 meses e projeção para os próximos 12">
+        <ng-container *ngFor="let g of grade">
+          <svg:line [attr.x1]="ME" [attr.x2]="W - MD" [attr.y1]="g.y" [attr.y2]="g.y" [attr.stroke]="g.cor" stroke-width="1" />
+          <svg:text [attr.x]="ME - 6" [attr.y]="g.yTexto" text-anchor="end">{{ g.rotulo }}</svg:text>
+        </ng-container>
+        <svg:line [attr.x1]="ME" [attr.x2]="W - MD" [attr.y1]="yMais" [attr.y2]="yMais" stroke="#898781" stroke-width="1" stroke-dasharray="4 4" />
+        <svg:line [attr.x1]="ME" [attr.x2]="W - MD" [attr.y1]="yMenos" [attr.y2]="yMenos" stroke="#898781" stroke-width="1" stroke-dasharray="4 4" />
+        <ng-container *ngIf="divisa">
+          <svg:line [attr.x1]="divisa.x" [attr.x2]="divisa.x" [attr.y1]="MT - 10" [attr.y2]="H - MB" stroke="#898781" stroke-width="1" />
+          <svg:text [attr.x]="divisa.xa" [attr.y]="MT - 2" text-anchor="end" class="cl-eixo-unid">observado</svg:text>
+          <svg:text [attr.x]="divisa.xb" [attr.y]="MT - 2" class="cl-eixo-unid">projeção</svg:text>
+        </ng-container>
+        <ng-container *ngFor="let b of barras">
+          <svg:path [attr.d]="b.d" [attr.fill]="b.cor" />
+          <svg:line *ngIf="b.inc" [attr.x1]="b.x" [attr.x2]="b.x" [attr.y1]="b.inc.y1" [attr.y2]="b.inc.y2" stroke="#52514e" stroke-width="1.2" />
+          <svg:text [attr.x]="b.x" [attr.y]="H - MB + 14" text-anchor="middle">{{ b.letra }}</svg:text>
+          <svg:text *ngIf="b.ano" [attr.x]="b.x" [attr.y]="H - MB + 27" text-anchor="middle" class="cl-eixo-unid">{{ b.ano }}</svg:text>
+        </ng-container>
+        <svg:text *ngFor="let r of rotulos" [attr.x]="r.x" [attr.y]="r.y" text-anchor="middle" class="cl-rotulo-direto">{{ r.texto }}</svg:text>
+        <svg:g *ngFor="let b of barras" class="ff-hit" [acTip]="b.dica">
+          <svg:line [attr.x1]="b.x" [attr.x2]="b.x" [attr.y1]="MT" [attr.y2]="H - MB" stroke="rgba(0,0,0,.25)" stroke-width="1" />
+          <svg:rect [attr.x]="b.xHit" y="0" [attr.width]="larg" [attr.height]="H" />
+        </svg:g>
+      </svg>
+    </section>
+  </div>
+
+  <section class="cm-card cm-tabela-wrap">
+    <div class="cl-card__cab cl-card__cab--pad">
+      <h2>O que El Niño e La Niña fazem nesta região</h2>
+      <span class="cm-contador">medido nos dados de {{ imp.periodo }} · evento moderado (ONI ±1,0)</span>
+    </div>
+    <p class="cm-ajuda cl-pad">
+      Diferença em relação à normal de cada mês. Vermelho = mais seco ou mais quente; azul = mais chuvoso ou mais frio.
+      Valores em cinza com “~” têm evidência fraca e quase não pesam na previsão; “—” = sem efeito detectado.
+    </p>
+    <div class="cm-tabela-scroll">
+      <table class="cm-tabela cl-mapa">
+        <thead>
+          <tr>
+            <th rowspan="2">Mês</th>
+            <th colspan="2" class="cl-centro">Chuva (%)</th>
+            <th colspan="2" class="cl-centro">Temp. máxima (°C)</th>
+            <th colspan="2" class="cl-centro">Temp. mínima (°C)</th>
+          </tr>
+          <tr><th *ngFor="let c of colunas" class="cl-centro">{{ c.titulo }}</th></tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let l of mapa">
+            <td><b>{{ cf.nomeMes(l.mes) }}</b></td>
+            <td *ngFor="let c of l.celulas" [class]="c.classe" [style.background]="c.cor" [acTip]="c.dica">{{ c.texto }}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="cl-rodape">{{ imp.comoLer }}</p>
+  </section>
+</ng-container>

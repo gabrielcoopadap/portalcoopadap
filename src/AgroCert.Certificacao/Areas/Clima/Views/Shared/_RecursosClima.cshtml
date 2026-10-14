@@ -1,0 +1,31 @@
+<link rel="stylesheet" href="~/_content/AgroCert.Certificacao/lib/material-icons/material-icons.css" />
+<link rel="stylesheet" href="~/_content/AgroCert.Certificacao/css/certificacao.css" asp-append-version="true" />
+<link rel="stylesheet" href="~/_content/AgroCert.Certificacao/css/clima.css" asp-append-version="true" />
+@{
+    var aba = ViewData["AbaClima"] as string ?? "resumo";
+    var abas = new (string Id, string Icone, string Texto, string Rota)[]
+    {
+        ("resumo", "home", "Resumo", "/clima"),
+        ("previsao", "calendar_month", "Previsão detalhada", "/clima/previsao"),
+        ("enso", "waves", "El Niño / La Niña", "/clima/enso"),
+        ("validacao", "rule", "Validação do modelo", "/clima/validacao"),
+        ("dados", "storage", "Base de dados", "/clima/dados"),
+    };
+}
+<div class="cm-topo">
+    <div>
+        <p class="cm-eyebrow">Clima</p>
+        <h1 class="cm-titulo">@Html.Icone("thermostat") Clima e El Niño</h1>
+        <p class="cm-subtitulo">Previsão mensal com ciclo climático e o efeito do El Niño / La Niña medido nos dados da estação.</p>
+    </div>
+</div>
+<nav class="cm-abas cl-abas" aria-label="Seções do módulo Clima">
+    @foreach (var (id, icone, texto, rota) in abas)
+    {
+        <a class="cm-aba @(id == aba ? "is-ativa" : "")" href="@rota" aria-current="@(id == aba ? "page" : null)">@Html.Icone(icone) @texto</a>
+    }
+</nav>
+@if (ViewData["Erro"] is string erro)
+{
+    <div class="cm-alerta cm-alerta--erro" role="alert">@Html.Icone("error_outline")<div>@erro</div></div>
+}

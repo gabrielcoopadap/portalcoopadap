@@ -1,0 +1,79 @@
+@model Certificacao?
+@{
+    var c = Model;
+    var edicao = c != null && c.Id > 0;
+    var acao = edicao ? $"/certificacao/certificacoes/{c!.Id}" : "/certificacao/certificacoes";
+    string D(DateOnly? d) => d?.ToString("yyyy-MM-dd") ?? "";
+}
+<dialog class="cm-modal" id="modal-certificacao" aria-labelledby="titulo-modal-cert">
+    <form method="post" action="@acao">
+        @Html.AntiForgeryToken()
+        <div class="cm-modal__cab">
+            <h2 class="cm-modal__titulo" id="titulo-modal-cert">@(edicao ? "Editar Certificação" : "Nova Certificação")</h2>
+            <button type="button" class="cm-icone-btn" data-fechar-modal aria-label="Fechar">@Html.Icone("close")</button>
+        </div>
+        <div class="cm-modal__corpo">
+            <div class="cm-linha" style="grid-template-columns:3fr 1fr">
+                <div class="cm-campo"><label for="c-nome">Nome *</label><input id="c-nome" class="cm-input" name="Nome" required value="@c?.Nome" placeholder="Ex: Rainforest Alliance" /></div>
+                <div class="cm-campo"><label for="c-sigla">Sigla</label><input id="c-sigla" class="cm-input" name="Sigla" maxlength="3" value="@c?.Sigla" /></div>
+            </div>
+            <div class="cm-campo"><label for="c-escopo">Escopo</label><input id="c-escopo" class="cm-input" name="Escopo" value="@c?.Escopo" placeholder="Ex: Produção de café — 420 ha" /></div>
+            <div class="cm-linha">
+                <div class="cm-campo"><label for="c-status">Status</label>
+                    <select id="c-status" class="cm-select" name="Status">
+                        @foreach (var s in Rotulos.StatusCertificacao)
+                        {
+                            <option selected="@(s == (c?.Status ?? "Conforme"))">@s</option>
+                        }
+                    </select>
+                </div>
+                <div class="cm-campo"><label for="c-cor">Cor</label><input id="c-cor" type="color" class="cm-input" name="Cor" value="@(c?.Cor ?? "#5e9a42")" /></div>
+            </div>
+            <p class="cm-ajuda">Conformidade, totais e contagens são recalculados automaticamente quando há requisitos da norma na lista mestra; os valores abaixo valem para normas sem requisitos cadastrados.</p>
+            <div class="cm-linha">
+                <div class="cm-campo"><label for="c-conf">Conformidade (%)</label><input id="c-conf" type="number" min="0" max="100" class="cm-input" name="Conformidade" value="@(c?.Conformidade ?? 0)" /></div>
+                <div class="cm-campo"><label for="c-total">Total de requisitos</label><input id="c-total" type="number" min="0" class="cm-input" name="TotalRequisitos" value="@(c?.TotalRequisitos ?? 0)" /></div>
+            </div>
+            <div class="cm-linha cm-linha--3">
+                <div class="cm-campo"><label for="c-cf">Conformes</label><input id="c-cf" type="number" min="0" class="cm-input" name="Conformes" value="@(c?.Conformes ?? 0)" /></div>
+                <div class="cm-campo"><label for="c-pd">Pendentes</label><input id="c-pd" type="number" min="0" class="cm-input" name="Pendentes" value="@(c?.Pendentes ?? 0)" /></div>
+                <div class="cm-campo"><label for="c-nc">Não conformes</label><input id="c-nc" type="number" min="0" class="cm-input" name="NaoConformes" value="@(c?.NaoConformes ?? 0)" /></div>
+            </div>
+            <div class="cm-campo"><label for="c-org">Organismo certificador</label><input id="c-org" class="cm-input" name="Organismo" value="@c?.Organismo" placeholder="Ex: Bureau Veritas" /></div>
+            <div class="cm-linha cm-linha--3">
+                <div class="cm-campo"><label for="c-val">Válido até</label><input id="c-val" type="date" class="cm-input" name="ValidoAte" value="@D(c?.ValidoAte)" /></div>
+                <div class="cm-campo"><label for="c-ult">Última auditoria</label><input id="c-ult" type="date" class="cm-input" name="UltimaAuditoria" value="@D(c?.UltimaAuditoria)" /></div>
+                <div class="cm-campo"><label for="c-prox">Próxima auditoria</label><input id="c-prox" type="date" class="cm-input" name="ProximaAuditoria" value="@D(c?.ProximaAuditoria)" /></div>
+            </div>
+
+            <span class="cm-rotulo">Conformidade por categoria</span>
+            <div class="cm-lista-edit" id="lista-categorias" style="margin-top:6px">
+                @if (c != null)
+                {
+                    foreach (var cat in c.Categorias)
+                    {
+                        <div class="cm-lista-edit__linha cm-lista-edit__linha--cat">
+                            <input class="cm-input" name="Categorias[__i__].Nome" placeholder="Categoria" value="@cat.Nome" aria-label="Categoria" />
+                            <input class="cm-input" type="number" min="0" name="Categorias[__i__].Conformes" placeholder="Conformes" value="@cat.Conformes" aria-label="Conformes" />
+                            <input class="cm-input" type="number" min="0" name="Categorias[__i__].Total" placeholder="Total" value="@cat.Total" aria-label="Total" />
+                            <button type="button" class="cm-icone-btn" data-remover-linha title="Remover">@Html.Icone("close")</button>
+                        </div>
+                    }
+                }
+            </div>
+            <template id="tpl-categoria">
+                <div class="cm-lista-edit__linha cm-lista-edit__linha--cat">
+                    <input class="cm-input" name="Categorias[__i__].Nome" placeholder="Categoria" aria-label="Categoria" />
+                    <input class="cm-input" type="number" min="0" name="Categorias[__i__].Conformes" placeholder="Conformes" value="0" aria-label="Conformes" />
+                    <input class="cm-input" type="number" min="0" name="Categorias[__i__].Total" placeholder="Total" value="0" aria-label="Total" />
+                    <button type="button" class="cm-icone-btn" data-remover-linha title="Remover">@Html.Icone("close")</button>
+                </div>
+            </template>
+            <button type="button" class="cm-btn cm-btn--texto cm-btn--pequeno" data-adicionar-linha="lista-categorias" data-template="tpl-categoria">@Html.Icone("add") Categoria</button>
+        </div>
+        <div class="cm-modal__acoes">
+            <button type="button" class="cm-btn cm-btn--contorno" data-fechar-modal>Cancelar</button>
+            <button type="submit" class="cm-btn cm-btn--primario" data-carregando="Salvando...">@(edicao ? "Salvar" : "Cadastrar")</button>
+        </div>
+    </form>
+</dialog>

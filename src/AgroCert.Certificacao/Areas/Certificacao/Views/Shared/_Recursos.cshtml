@@ -1,0 +1,14 @@
+<link rel="stylesheet" href="~/_content/AgroCert.Certificacao/lib/material-icons/material-icons.css" />
+<link rel="stylesheet" href="~/_content/AgroCert.Certificacao/css/certificacao.css" asp-append-version="true" />
+@{
+    var erro = TempData[TratarErrosAttribute.ChaveErro] as string;
+    var ok = TempData[TratarErrosAttribute.ChaveSucesso] as string;
+}
+@if (!string.IsNullOrEmpty(erro))
+{
+    <div class="cm-alerta cm-alerta--erro" role="alert">@Html.Icone("error_outline")<div>@erro</div></div>
+}
+@if (!string.IsNullOrEmpty(ok))
+{
+    <div class="cm-alerta cm-alerta--ok" role="status">@Html.Icone("check_circle")<div>@ok</div></div>
+}

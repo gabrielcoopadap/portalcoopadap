@@ -1,0 +1,98 @@
+<a class="cm-voltar" [routerLink]="'fauna-flora' | acRota"><span class="material-icons" aria-hidden="true">arrow_back</span> Fauna e Flora</a>
+
+<div class="cm-topo">
+  <div>
+    <h1 class="cm-titulo"><span class="material-icons" aria-hidden="true">list_alt</span> Registros de ocorrência</h1>
+    <p class="cm-subtitulo" *ngIf="todos">{{ filtrados.length }} de {{ todos.length }} registro(s){{ especieFiltro ? ' — ' + especieFiltro.nomePopular : '' }}</p>
+  </div>
+  <div class="cm-acoes">
+    <a class="cm-btn cm-btn--contorno" [routerLink]="'fauna-flora/especies' | acRota"><span class="material-icons" aria-hidden="true">menu_book</span> Catálogo de espécies</a>
+    <button type="button" class="cm-btn cm-btn--primario" (click)="modalRegistro.abrir()"><span class="material-icons" aria-hidden="true">add_a_photo</span> Novo registro</button>
+  </div>
+</div>
+
+<form class="cm-card cm-filtros" [class.is-fechado]="filtrosFechados" (ngSubmit)="filtrar()">
+  <div class="cm-filtros__topo">
+    <span class="cm-filtros__rotulo">Filtros</span>
+    <button type="button" class="cm-filtros__alternar" (click)="filtrosFechados = !filtrosFechados">
+      <span class="material-icons" aria-hidden="true">{{ filtrosFechados ? 'expand_more' : 'expand_less' }}</span><span class="rot">{{ filtrosFechados ? 'Mostrar filtros' : 'Esconder filtros' }}</span>
+    </button>
+  </div>
+  <div class="cm-filtros__corpo">
+    <div class="cm-campo">
+      <label for="fr-esp">Espécie</label>
+      <select id="fr-esp" class="cm-select" name="especieId" [(ngModel)]="filtro.especieId">
+        <option value="">Todas</option>
+        <option *ngFor="let e of especies" [value]="'' + e.id">{{ e.nomePopular }}</option>
+      </select>
+    </div>
+    <div class="cm-campo">
+      <label for="fr-reino">Fauna / Flora</label>
+      <select id="fr-reino" class="cm-select" name="reino" [(ngModel)]="filtro.reino">
+        <option value="">Todas</option>
+        <option value="FAUNA">Fauna</option>
+        <option value="FLORA">Flora</option>
+      </select>
+    </div>
+    <div class="cm-campo">
+      <label for="fr-orig">Origem</label>
+      <select id="fr-orig" class="cm-select" name="origem" [(ngModel)]="filtro.origem">
+        <option value="">Todas</option>
+        <option *ngFor="let o of origens" [value]="o">{{ rotuloOrigem(o) }}</option>
+      </select>
+    </div>
+    <div class="cm-campo">
+      <label for="fr-dias">Período</label>
+      <select id="fr-dias" class="cm-select" name="dias" [(ngModel)]="filtro.dias">
+        <option value="0">Todo o histórico</option>
+        <option value="30">Últimos 30 dias</option>
+        <option value="90">Últimos 90 dias</option>
+        <option value="365">Últimos 12 meses</option>
+      </select>
+    </div>
+    <div class="cm-filtros__botoes">
+      <a *ngIf="temFiltros" class="cm-btn cm-btn--contorno" [routerLink]="'fauna-flora/registros' | acRota">Limpar</a>
+      <button type="submit" class="cm-btn cm-btn--primario"><span class="material-icons" aria-hidden="true">filter_alt</span> Filtrar</button>
+    </div>
+  </div>
+</form>
+
+<ac-estado [carregando]="!todos && !erro" [erro]="erro" (tentarDeNovo)="carregar()"></ac-estado>
+
+<ng-container *ngIf="todos">
+  <div class="cm-card cm-tabela-wrap">
+    <div class="cm-tabela-scroll">
+      <table class="cm-tabela">
+        <thead><tr><th style="width:56px"></th><th>Espécie</th><th>Data</th><th>Origem</th><th>Área</th><th>Localização</th><th>Registrado por</th><th style="width:48px"></th></tr></thead>
+        <tbody>
+          <tr *ngIf="filtrados.length === 0"><td colspan="8" class="cm-tabela__vazio">Nenhum registro encontrado.</td></tr>
+          <tr *ngFor="let l of visiveis; trackBy: porId">
+            <td>
+              <a *ngIf="l.r.fotoUrl; else semLink" [href]="l.r.fotoUrl | acArquivo" target="_blank"><div acFfFoto class="ff-thumb" [url]="l.foto" [grupo]="l.g" [alt]="l.r.especie"></div></a>
+              <ng-template #semLink><div acFfFoto class="ff-thumb" [url]="l.foto" [grupo]="l.g" [alt]="l.r.especie"></div></ng-template>
+            </td>
+            <td>
+              <div class="cm-t-titulo">{{ l.r.especie }}</div>
+              <div class="cm-t-sub"><i>{{ l.r.nomeCientifico }}</i> · {{ l.g.nome }}{{ (l.r.quantidade ?? 0) > 1 ? ' · ' + l.r.quantidade + ' indivíduos' : '' }}</div>
+              <div class="cm-t-sub" *ngIf="l.r.observacao?.trim()">{{ l.r.observacao }}</div>
+            </td>
+            <td style="white-space:nowrap">{{ l.data }}<div class="cm-t-sub">{{ l.hora }}</div></td>
+            <td>{{ rotuloOrigem(l.r.origem) }}<div class="cm-t-sub" *ngIf="l.r.camera != null">{{ l.r.camera }}</div></td>
+            <td>{{ l.r.area ?? '—' }}<div class="cm-t-sub" *ngIf="l.r.propriedadeNome != null">{{ l.r.propriedadeNome }}</div></td>
+            <td style="white-space:nowrap">
+              <a *ngIf="l.lat !== null; else semLocal" [href]="'https://www.google.com/maps?q=' + l.lat + ',' + l.lon" target="_blank" rel="noopener">{{ l.lat }}, {{ l.lon }}</a>
+              <ng-template #semLocal><span>—</span></ng-template>
+            </td>
+            <td>{{ l.r.registradoPor ?? '—' }}</td>
+            <td>
+              <button type="button" class="cm-icone-btn" title="Excluir" [disabled]="excluindo === l.r.id" (click)="excluir(l.r)"><span class="material-icons" aria-hidden="true">delete_outline</span></button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <p class="cm-ajuda" *ngIf="filtrados.length > 500">Mostrando os 500 mais recentes — use os filtros para ver os demais.</p>
+</ng-container>
+
+<ac-ff-modal-registro #modalRegistro [especies]="especies" [propriedades]="propriedades" (salvo)="carregar()"></ac-ff-modal-registro>

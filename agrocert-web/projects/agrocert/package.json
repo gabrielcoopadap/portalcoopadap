@@ -1,0 +1,15 @@
+{
+  "name": "agrocert",
+  "version": "0.0.1",
+  "peerDependencies": {
+    "@angular/common": ">=18.0.0",
+    "@angular/core": ">=18.0.0",
+    "@angular/router": ">=18.0.0",
+    "leaflet": "^1.9.4"
+  },
+  "dependencies": {
+    "tslib": "^2.3.0"
+  },
+  "sideEffects": false,
+  "description": "Telas do AgroCert (certifica\u00e7\u00e3o, ambiental, fauna e flora, corredores e clima) para o Portal Coopadap"
+}

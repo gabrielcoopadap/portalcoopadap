@@ -1,0 +1,2 @@
+Fonte do portal de teste: Nunito (gratuita, licenca OFL), na pasta Nunito/static.
+O portal real usa a Redonda; em producao as telas herdam a fonte do portal.

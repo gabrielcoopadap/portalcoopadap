@@ -1,0 +1,17 @@
+FONTE DO PORTAL COOPADAP — "Redonda"
+====================================
+
+O portal usa a família "Redonda" (arquivos .otf: Redonda-light, Redonda-regular,
+Redonda-medium, Redonda-bold). É uma fonte licenciada pela Coopadap, por isso os
+arquivos NÃO vêm neste pacote.
+
+Para o módulo ficar com a mesma fonte do portal, copie os 4 arquivos para esta pasta
+com estes nomes (a equipe da Viceri tem os originais no projeto do portal):
+
+    Redonda-light.otf
+    Redonda-regular.otf
+    Redonda-medium.otf
+    Redonda-bold.otf
+
+Enquanto os arquivos não estiverem aqui, o CSS usa Roboto (mesmo fallback do portal).
+Quando o módulo rodar dentro do portal, o @font-face do próprio portal já resolve.

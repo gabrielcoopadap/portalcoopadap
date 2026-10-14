@@ -1,0 +1,228 @@
+<ac-clima-cabecalho aba="previsao" [erro]="erro"></ac-clima-cabecalho>
+<ac-clima-indisponivel *ngIf="indisponivel" [endereco]="endereco" (tentarDeNovo)="carregar()"></ac-clima-indisponivel>
+
+<ng-container *ngIf="!indisponivel">
+<form class="cm-card cl-filtros" (ngSubmit)="filtrar()">
+  <div class="cm-campo">
+    <label for="cl-ano">Ano</label>
+    <input id="cl-ano" class="cm-input" type="number" name="ano" min="1900" max="2200" [(ngModel)]="form.ano" />
+  </div>
+  <div class="cm-campo cl-filtros__oni">
+    <label for="cl-oni">ONI oficial (opcional)</label>
+    <input id="cl-oni" class="cm-input" type="text" name="oni" [(ngModel)]="form.oni" placeholder="ex.: 10:1.6, 11:1.8, 12:1.9" />
+  </div>
+  <div class="cm-campo">
+    <label for="cl-ciclo">Ciclo (anos)</label>
+    <input id="cl-ciclo" class="cm-input" type="number" name="ciclo" min="1" max="200" [(ngModel)]="form.ciclo" />
+  </div>
+  <div class="cm-campo">
+    <label for="cl-peso">Peso do ciclo</label>
+    <select id="cl-peso" class="cm-select" name="pesoCiclo" [(ngModel)]="form.pesoCiclo" [compareWith]="mesmoPeso">
+      <option *ngFor="let v of pesos" [ngValue]="v">{{ cf.pct(v) }}</option>
+    </select>
+  </div>
+  <div class="cm-campo">
+    <label for="cl-nivel">Faixa min–máx</label>
+    <select id="cl-nivel" class="cm-select" name="nivel" [(ngModel)]="form.nivel">
+      <option *ngFor="let v of niveis" [ngValue]="v">{{ v }}% dos casos</option>
+    </select>
+  </div>
+  <button type="submit" class="cm-btn cm-btn--primario"><span class="material-icons" aria-hidden="true">refresh</span> Atualizar</button>
+  <p class="cm-ajuda cl-filtros__ajuda">
+    Sem ONI informado, os meses já medidos usam o valor real e os seguintes são projetados pelo modelo.
+    Para usar a previsão da NOAA/IRI: um valor para o ano todo (<code>1.5</code>), 12 valores de jan a dez
+    (<code>0.8,1.0,…</code>) ou só alguns meses (<code>10:1.6,11:1.8</code>).
+  </p>
+</form>
+
+<ac-estado [carregando]="carregando"></ac-estado>
+
+<ng-container *ngIf="m">
+  <div *ngFor="let aviso of m.avisos" class="cm-alerta cm-alerta--info" role="status"><span class="material-icons" aria-hidden="true">info</span><div>{{ aviso }}</div></div>
+
+  <section class="cm-indicadores">
+    <div class="cm-card cm-indicador">
+      <div class="cm-indicador__topo"><span>ENSO predominante em {{ m.anoAlvo }}</span><span class="material-icons" aria-hidden="true">waves</span></div>
+      <div class="cm-indicador__valor"><span [class]="'cl-fase ' + cf.classeFase(m.ensoAno.fasePredominante)">{{ cf.nomeFase(m.ensoAno.fasePredominante) }}</span></div>
+      <div class="cm-indicador__sub">ONI médio {{ cf.s(m.ensoAno.oniMedio) }} · pico: {{ pico }}</div>
+    </div>
+    <div class="cm-card cm-indicador">
+      <div class="cm-indicador__topo"><span>Chuva prevista no ano</span><span class="material-icons" aria-hidden="true">water_drop</span></div>
+      <div class="cm-indicador__valor">{{ cf.n(chuvaAno, 0) }} mm</div>
+      <div class="cm-indicador__sub">Normal {{ cf.n(normalAno, 0) }} mm ({{ normalAno > 0 ? cf.s((chuvaAno - normalAno) / normalAno * 100, 0) + '%' : '-' }})</div>
+    </div>
+    <div class="cm-card cm-indicador">
+      <div class="cm-indicador__topo"><span>Riscos para a lavoura</span><span class="material-icons" aria-hidden="true" [style.color]="altos > 0 ? '#d03b3b' : null">report</span></div>
+      <div class="cm-indicador__valor">{{ altos }} <small class="cl-kpi-unid">alto(s)</small></div>
+      <div class="cm-indicador__sub">{{ riscos.length - altos }} de atenção · veja a lista abaixo</div>
+    </div>
+    <div class="cm-card cm-indicador">
+      <div class="cm-indicador__topo"><span>Ciclo de {{ m.ciclo }} anos</span><span class="material-icons" aria-hidden="true">history</span></div>
+      <div class="cm-indicador__valor cm-indicador__valor--data">{{ m.cicloDisponivel ? m.anoReferencia : 'Sem dados' }}</div>
+      <div class="cm-indicador__sub">{{ m.cicloDisponivel ? 'Entra com peso ' + cf.pct(m.pesoCiclo) + ', sem o ENSO daquele ano' : 'Não há dados de ' + m.anoReferencia + ' na base' }}</div>
+    </div>
+  </section>
+
+  <p class="cl-resumo"><span class="material-icons" aria-hidden="true">insights</span> {{ m.resumo }}</p>
+
+  <section class="cm-card cl-card">
+    <div class="cl-card__cab">
+      <h2>Chuva por mês — {{ m.anoAlvo }}</h2>
+      <span class="cm-contador">mm · faixa de {{ nivelTxt }} dos casos</span>
+    </div>
+    <div class="ff-legenda cl-legenda">
+      <span><i class="cl-leg-barra"></i>Prevista</span>
+      <span><i class="cl-leg-faixa"></i>Faixa min–máx</span>
+      <span><i class="cl-leg-normal"></i>Normal do mês</span>
+      <span><i class="cl-leg-obs"></i>Observado</span>
+      <span class="cl-leg-sep"></span>
+      <span><i class="cl-fase-mini cl-fase--nino"></i>El Niño</span>
+      <span><i class="cl-fase-mini cl-fase--nina"></i>La Niña</span>
+      <span><i class="cl-fase-mini cl-fase--neutro"></i>Neutro</span>
+      <span><i class="cl-fase-mini cl-fase--proj"></i>ONI projetado</span>
+    </div>
+    <svg class="ff-grafico cl-grafico" [attr.viewBox]="'0 0 ' + W + ' ' + H" role="img" [attr.aria-label]="'Chuva prevista, faixa e normal por mês em ' + m.anoAlvo">
+      <ng-container *ngFor="let g of gradeChuva">
+        <svg:line [attr.x1]="ME" [attr.x2]="W - MD" [attr.y1]="g.y" [attr.y2]="g.y" [attr.stroke]="g.cor" stroke-width="1" />
+        <svg:text [attr.x]="ME - 6" [attr.y]="g.yTexto" text-anchor="end">{{ g.rotulo }}</svg:text>
+      </ng-container>
+      <ng-container *ngFor="let b of barras">
+        <svg:path [attr.d]="b.barra" fill="#2a78d6" />
+        <svg:line [attr.x1]="b.x" [attr.x2]="b.x" [attr.y1]="b.yMax" [attr.y2]="b.yMin" stroke="#52514e" stroke-width="1.5" />
+        <svg:line [attr.x1]="b.xa" [attr.x2]="b.xb" [attr.y1]="b.yMax" [attr.y2]="b.yMax" stroke="#52514e" stroke-width="1.5" />
+        <svg:line [attr.x1]="b.xa" [attr.x2]="b.xb" [attr.y1]="b.yMin" [attr.y2]="b.yMin" stroke="#52514e" stroke-width="1.5" />
+        <svg:line [attr.x1]="b.xn0" [attr.x2]="b.xn1" [attr.y1]="b.yNormal" [attr.y2]="b.yNormal" stroke="#0b0b0b" stroke-width="2.5" stroke-linecap="round" />
+        <svg:circle *ngIf="b.obs" [attr.cx]="b.obs.cx" [attr.cy]="b.obs.cy" r="4.5" fill="#fff" stroke="#0b0b0b" stroke-width="2" />
+        <svg:text [attr.x]="b.x" [attr.y]="b.yMes" text-anchor="middle">{{ b.mesCurto }}</svg:text>
+        <svg:rect [attr.x]="b.xFase" [attr.y]="b.yFase" width="38" height="18" rx="9" [attr.class]="b.classeFase" />
+        <svg:text [attr.x]="b.x" [attr.y]="b.yOni" text-anchor="middle" class="cl-fase-txt">{{ b.oni }}</svg:text>
+      </ng-container>
+      <svg:text [attr.x]="ME - 6" [attr.y]="yOniEixo" text-anchor="end" class="cl-eixo-unid">ONI</svg:text>
+      <svg:g *ngFor="let b of barras" class="ff-hit" [acTip]="b.dica">
+        <svg:line [attr.x1]="b.x" [attr.x2]="b.x" [attr.y1]="MT" [attr.y2]="baseC" stroke="rgba(0,0,0,.25)" stroke-width="1" />
+        <svg:rect [attr.x]="b.xHit" y="0" [attr.width]="larg" [attr.height]="H" />
+      </svg:g>
+    </svg>
+  </section>
+
+  <section class="cm-card cl-card">
+    <div class="cl-card__cab">
+      <h2>Temperaturas máxima e mínima — {{ m.anoAlvo }}</h2>
+      <span class="cm-contador">°C · faixa de {{ nivelTxt }} dos casos</span>
+    </div>
+    <div class="ff-legenda cl-legenda">
+      <span><i style="background:#eb6834"></i>Máxima prevista</span>
+      <span><i style="background:#2a78d6"></i>Mínima prevista</span>
+      <span><i class="cl-leg-tracejado"></i>Normal do mês</span>
+      <span><i class="cl-leg-faixa-t"></i>Faixa min–máx</span>
+    </div>
+    <svg class="ff-grafico cl-grafico" [attr.viewBox]="'0 0 ' + W + ' ' + HT" role="img" [attr.aria-label]="'Temperaturas máxima e mínima previstas por mês em ' + m.anoAlvo">
+      <ng-container *ngFor="let g of gradeTemp">
+        <svg:line [attr.x1]="ME" [attr.x2]="W - MD - 30" [attr.y1]="g.y" [attr.y2]="g.y" stroke="#ececec" stroke-width="1" />
+        <svg:text [attr.x]="ME - 6" [attr.y]="g.yTexto" text-anchor="end">{{ g.rotulo }}</svg:text>
+      </ng-container>
+      <ng-container *ngIf="temp">
+        <svg:polygon [attr.points]="temp.faixaMax" fill="#eb6834" fill-opacity=".13" />
+        <svg:polygon [attr.points]="temp.faixaMin" fill="#2a78d6" fill-opacity=".13" />
+        <svg:polyline [attr.points]="temp.normalMax" fill="none" stroke="#eb6834" stroke-opacity=".75" stroke-width="1.5" stroke-dasharray="4 4" />
+        <svg:polyline [attr.points]="temp.normalMin" fill="none" stroke="#2a78d6" stroke-opacity=".75" stroke-width="1.5" stroke-dasharray="4 4" />
+        <svg:polyline [attr.points]="temp.linhaMax" fill="none" stroke="#eb6834" stroke-width="2" stroke-linejoin="round" />
+        <svg:polyline [attr.points]="temp.linhaMin" fill="none" stroke="#2a78d6" stroke-width="2" stroke-linejoin="round" />
+        <svg:text [attr.x]="temp.xRotulo" [attr.y]="temp.yRotuloMax" class="cl-rotulo-direto">Máx.</svg:text>
+        <svg:text [attr.x]="temp.xRotulo" [attr.y]="temp.yRotuloMin" class="cl-rotulo-direto">Mín.</svg:text>
+      </ng-container>
+      <ng-container *ngFor="let p of pontosTemp">
+        <svg:circle [attr.cx]="p.x" [attr.cy]="p.yMax" r="3.5" fill="#eb6834" stroke="#fff" stroke-width="2" />
+        <svg:circle [attr.cx]="p.x" [attr.cy]="p.yMin" r="3.5" fill="#2a78d6" stroke="#fff" stroke-width="2" />
+        <svg:text [attr.x]="p.x" [attr.y]="HT - 8" text-anchor="middle">{{ p.mesCurto }}</svg:text>
+      </ng-container>
+      <svg:g *ngFor="let p of pontosTemp" class="ff-hit" [acTip]="p.dica">
+        <svg:line [attr.x1]="p.x" [attr.x2]="p.x" [attr.y1]="MT" [attr.y2]="HT - MBT" stroke="rgba(0,0,0,.25)" stroke-width="1" />
+        <svg:rect [attr.x]="p.xHit" y="0" [attr.width]="larg" [attr.height]="HT" />
+      </svg:g>
+    </svg>
+  </section>
+
+  <div class="cl-duas">
+    <section class="cm-card cl-card">
+      <div class="cl-card__cab"><h2>Riscos para a lavoura</h2><span class="cm-contador">{{ riscos.length }} aviso(s)</span></div>
+      <div *ngIf="riscos.length === 0" class="cm-vazio">Nenhum mês com chance relevante (≥ 45%) de fugir do normal.</div>
+      <ul *ngIf="riscos.length > 0" class="cl-riscos">
+        <li *ngFor="let x of riscos" [class]="'cl-risco cl-risco--' + (x.alto ? 'alto' : 'atencao')">
+          <span class="cl-risco__icone"><span class="material-icons" aria-hidden="true">{{ x.icone }}</span></span>
+          <div>
+            <div class="cl-risco__cab">
+              <b>{{ cf.nomeMes(x.mes.mes) }} · {{ x.rotulo }}</b>
+              <span [class]="'cl-status cl-status--' + (x.alto ? 'alto' : 'atencao')">
+                <span class="material-icons" aria-hidden="true">{{ x.alto ? 'error' : 'warning' }}</span>{{ x.alto ? 'Alto' : 'Atenção' }} · {{ cf.pct(x.risco.probabilidade) }}
+              </span>
+            </div>
+            <p>{{ x.risco.mensagem }}</p>
+          </div>
+        </li>
+      </ul>
+    </section>
+
+    <section class="cm-card cl-card">
+      <div class="cl-card__cab"><h2>Anos parecidos</h2><span class="cm-contador">ENSO mais próximo do previsto</span></div>
+      <p class="cm-ajuda">Anos em que o ONI teve trajetória parecida com a prevista para {{ m.anoAlvo }}. Servem de referência para conversar com o produtor.</p>
+      <table class="cm-tabela cl-tabela-compacta">
+        <thead><tr><th>Ano</th><th>ENSO no ano (pico)</th><th class="cl-num">ONI médio</th><th class="cl-num">Distância</th></tr></thead>
+        <tbody>
+          <tr *ngFor="let a of m.anosAnalogos"><td><b>{{ a.ano }}</b></td><td>{{ a.descricao }}</td><td class="cl-num">{{ cf.s(a.oniMedio, 2) }}</td><td class="cl-num">{{ cf.n(a.distancia, 2) }}</td></tr>
+        </tbody>
+      </table>
+      <details class="cl-metodo">
+        <summary>Como a previsão é feita</summary>
+        <p>{{ m.metodo }}</p>
+        <p>Margem: {{ m.margem === 'usuario' ? 'margem de erro cadastrada para o usuário.' : 'intervalo estatístico calculado pelo modelo.' }}</p>
+      </details>
+    </section>
+  </div>
+
+  <section class="cm-card cm-tabela-wrap">
+    <div class="cl-card__cab cl-card__cab--pad"><h2>Tabela mês a mês</h2><span class="cm-contador">faixa min–máx de {{ nivelTxt }}</span></div>
+    <div class="cm-tabela-scroll">
+      <table class="cm-tabela cl-tabela">
+        <thead>
+          <tr>
+            <th>Mês</th><th>ENSO</th><th class="cl-num">Chuva prevista</th><th class="cl-num">Normal</th><th class="cl-num">Anomalia</th>
+            <th>Chance: abaixo · normal · acima</th><th class="cl-num">Observado</th>
+            <th class="cl-num">Máxima</th><th class="cl-num">Mínima</th><th class="cl-num">Umidade</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let x of meses">
+            <td><b>{{ cf.nomeMes(x.mes) }}</b></td>
+            <td>
+              <span [class]="'cl-fase ' + cf.classeFase(x.enso.fase)" [title]="cf.rotuloOrigem(x.enso.origem)">{{ cf.nomeFase(x.enso.fase) }} {{ cf.s(x.enso.oni) }}</span>
+              <div class="cm-t-sub">{{ x.enso.origem === 'observado' ? 'observado' : x.enso.origem === 'informado' ? 'informado' : 'projetado ±' + cf.n(x.enso.incerteza) }}</div>
+            </td>
+            <td class="cl-num"><b>{{ cf.n(x.chuva.valor, 0) }} mm</b><div class="cm-t-sub">{{ cf.n(x.chuva.min, 0) }}–{{ cf.n(x.chuva.max, 0) }}</div></td>
+            <td class="cl-num">{{ cf.n(x.chuva.normal, 0) }} mm</td>
+            <td class="cl-num">{{ x.chuva.anomaliaPct !== null && x.chuva.anomaliaPct !== undefined ? cf.s(x.chuva.anomaliaPct, 0) + '%' : cf.s(x.chuva.anomalia, 0) + ' mm' }}</td>
+            <td>
+              <div class="cl-chance" role="img" [attr.aria-label]="'Abaixo ' + cf.pct(x.chuva.probAbaixoNormal) + ', normal ' + cf.pct(x.chuva.probDentroNormal) + ', acima ' + cf.pct(x.chuva.probAcimaNormal)">
+                <span class="cl-chance__abaixo" [style.flex-grow]="cf.f(x.chuva.probAbaixoNormal)"></span>
+                <span class="cl-chance__normal" [style.flex-grow]="cf.f(x.chuva.probDentroNormal)"></span>
+                <span class="cl-chance__acima" [style.flex-grow]="cf.f(x.chuva.probAcimaNormal)"></span>
+              </div>
+              <div class="cm-t-sub">{{ cf.pct(x.chuva.probAbaixoNormal) }} · {{ cf.pct(x.chuva.probDentroNormal) }} · {{ cf.pct(x.chuva.probAcimaNormal) }}</div>
+            </td>
+            <td class="cl-num">{{ x.chuva.observado !== null && x.chuva.observado !== undefined ? cf.n(x.chuva.observado, 0) + ' mm' : '—' }}</td>
+            <td class="cl-num">{{ cf.n(x.maxima.valor) }} °C<div class="cm-t-sub">normal {{ cf.n(x.maxima.normal) }}</div></td>
+            <td class="cl-num">{{ cf.n(x.minima.valor) }} °C<div class="cm-t-sub">normal {{ cf.n(x.minima.normal) }}</div></td>
+            <td class="cl-num">{{ cf.n(x.umidadeRelativa.valor, 0) }}%<div class="cm-t-sub">normal {{ cf.n(x.umidadeRelativa.normal, 0) }}%</div></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="cl-rodape">
+      <span class="cl-chance-leg cl-chance__abaixo"></span> abaixo do normal (tercil mais seco)
+      <span class="cl-chance-leg cl-chance__normal"></span> dentro do normal
+      <span class="cl-chance-leg cl-chance__acima"></span> acima do normal (tercil mais chuvoso).
+      Sem ENSO, cada faixa teria 33%.
+    </p>
+  </section>
+</ng-container>
+</ng-container>

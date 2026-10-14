@@ -1,0 +1,80 @@
+@import url("../_content/AgroCert.Certificacao/lib/roboto/roboto.css");
+
+@font-face { font-family: "Redonda Light"; src: url("../_content/AgroCert.Certificacao/fonts/Redonda-light.otf") format("opentype"); font-weight: 300; }
+@font-face { font-family: "Redonda"; src: url("../_content/AgroCert.Certificacao/fonts/Redonda-regular.otf") format("opentype"); font-weight: 400; }
+@font-face { font-family: "Redonda Medium"; src: url("../_content/AgroCert.Certificacao/fonts/Redonda-medium.otf") format("opentype"); font-weight: 500; }
+@font-face { font-family: "Redonda Bold"; src: url("../_content/AgroCert.Certificacao/fonts/Redonda-bold.otf") format("opentype"); font-weight: 700; }
+
+:root {
+  --pt-verde: #5e9a42;
+  --pt-fundo: #fafafa;
+  --pt-texto: rgba(0, 0, 0, .87);
+  --pt-menu-largura: 20rem;
+  --pt-topo: 64px;
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body { margin: 0; font-family: "Redonda Light", Roboto, sans-serif; background: var(--pt-fundo); color: var(--pt-texto); }
+.material-icons { font-size: 20px; line-height: 1; }
+
+.pt-toolbar { position: fixed; inset: 0 0 auto 0; height: var(--pt-topo); z-index: 40; display: flex; align-items: center; justify-content: space-between; padding: 0 1.3rem; background: var(--pt-verde); color: #fff; }
+.pt-toolbar__esq, .pt-toolbar__dir { display: flex; align-items: center; gap: 1rem; flex: 1; }
+.pt-toolbar__dir { justify-content: flex-end; gap: .6rem; }
+.toggle-button { background: none; border: none; cursor: pointer; color: #fff; display: inline-flex; padding: 6px; border-radius: 8px; }
+.toggle-button:hover { background-color: #8dac7e81; }
+.pt-logo { display: inline-flex; align-items: center; gap: 6px; color: #fff; text-decoration: none; }
+.pt-logo__icone { font-size: 30px; }
+.pt-logo__img { height: 38px; width: auto; display: block; }
+.pt-logo__texto { font-family: "Redonda Bold", Roboto, sans-serif; font-weight: 700; font-style: italic; font-size: 30px; letter-spacing: -.02em; }
+.pt-usuario { font-family: "Redonda Medium", Roboto, sans-serif; font-size: 14px; letter-spacing: .01em; margin-left: .8rem; }
+.pt-sair { color: #fff; display: inline-flex; }
+
+.pt-corpo { display: flex; padding-top: var(--pt-topo); min-height: 100%; }
+.pt-sidenav { position: fixed; top: var(--pt-topo); bottom: 0; left: 0; width: var(--pt-menu-largura); overflow-y: auto; overflow-x: hidden; background: var(--pt-verde); color: #fff; padding: .6rem 0 2rem; z-index: 30; transition: transform .3s cubic-bezier(.4, 0, .2, 1); }
+.pt-sidenav::-webkit-scrollbar { width: 8px; }
+.pt-sidenav::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, .35); border-radius: 8px; }
+body.menu-recolhido .pt-sidenav { transform: translateX(-100%); }
+.pt-conteudo { flex: 1; min-width: 0; margin-left: var(--pt-menu-largura); background: var(--pt-fundo); transition: margin .3s cubic-bezier(.4, 0, .2, 1); }
+body.menu-recolhido .pt-conteudo { margin-left: 0; }
+
+.menu-item { display: flex; align-items: center; gap: 1rem; width: calc(100% - 1.2rem); margin: 0 .6rem; min-height: 48px; padding: 0 16px; border: 0; border-radius: 8px; background: transparent; color: #fff; text-decoration: none; font: inherit; text-align: left; cursor: pointer; }
+.menu-item:hover { background-color: #0000000a; }
+.menu-item:focus-visible { outline: 2px solid #fff; outline-offset: -2px; }
+.menu-item .material-icons { color: #fff; font-size: 14px; width: 14px; flex-shrink: 0; }
+.active-menu-item { background-color: #a1b89975 !important; }
+.menu-text { color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.menu-group-title { font-size: 1.15rem; font-family: "Redonda Medium", Roboto, sans-serif; font-weight: 500; }
+.menu-route-text { font-size: .95rem; }
+.submenu-item .menu-route-text { font-size: .9rem; }
+.menu-seta { margin-left: auto; transition: transform .2s; }
+.menu-grupo.is-aberto > .menu-item .menu-seta { transform: rotate(180deg); }
+.submenu-container { display: none; padding-left: 16px; }
+.menu-grupo.is-aberto > .submenu-container { display: block; }
+.submenu-container .submenu-container .menu-route-text { font-size: 12.5px; }
+.mat-divider { border: 0; border-top: 1px solid #ffffff81; margin: .3rem .6rem; }
+
+.pt-banner { height: 142px; display: flex; align-items: center; padding: 0 2.5rem; color: #fff;
+  background: linear-gradient(100deg, rgba(34, 78, 30, .55), rgba(94, 154, 66, .15)),
+              radial-gradient(ellipse at 30% 120%, #7fb85b 0, #4f8b39 45%, #2f6427 100%); }
+.pt-banner__texto { font-family: "Redonda", Roboto, sans-serif; font-size: 34px; text-shadow: 0 1px 3px rgba(0, 0, 0, .25); }
+.pt-home { padding: 2rem 1rem 3rem; max-width: 1100px; }
+.pt-boasvindas { font-size: 26px; margin: 0 0 2rem; color: #444; }
+.pt-boasvindas span { color: #3e6e2a; font-family: "Redonda Medium", Roboto, sans-serif; }
+.pt-secao-titulo { display: flex; align-items: center; gap: 8px; font-family: "Redonda", Roboto, sans-serif; font-size: 22px; }
+.pt-secao-titulo .material-icons { color: var(--pt-verde); font-size: 24px; }
+.pt-ajuda { color: rgba(0, 0, 0, .6); margin: .4rem 0 1.2rem; }
+.pt-ajuda a { color: #4a7d33; }
+.pt-atalhos { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 14px; }
+.pt-atalho { display: flex; gap: 14px; align-items: center; padding: 16px 18px; background: #fff; border: 1px solid #e0e0e0; border-radius: 4px; color: inherit; text-decoration: none; box-shadow: 0 1px 2px rgba(0, 0, 0, .06); transition: box-shadow .15s, border-color .15s; }
+.pt-atalho:hover { border-color: var(--pt-verde); box-shadow: 0 3px 10px rgba(0, 0, 0, .1); }
+.pt-atalho > .material-icons { color: #fff; background: var(--pt-verde); border-radius: 50%; width: 40px; height: 40px; display: inline-flex; align-items: center; justify-content: center; font-size: 22px; flex: none; }
+.pt-atalho b { display: block; font-family: "Redonda Medium", Roboto, sans-serif; font-weight: 500; }
+.pt-atalho small { color: rgba(0, 0, 0, .6); font-size: 13px; }
+
+@media (max-width: 959px) {
+  .pt-sidenav { transform: translateX(-100%); box-shadow: 4px 0 16px rgba(0, 0, 0, .2); }
+  body.menu-aberto .pt-sidenav { transform: none; }
+  .pt-conteudo { margin-left: 0; }
+  .pt-usuario { display: none; }
+  .pt-banner__texto { font-size: 24px; }
+}

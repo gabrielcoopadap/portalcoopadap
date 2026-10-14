@@ -1,0 +1,43 @@
+<a class="cm-voltar" [routerLink]="'certificacoes' | acRota"><span class="material-icons" aria-hidden="true">arrow_back</span> Certificações Ativas</a>
+
+<ac-estado [carregando]="!c && !erro" [erro]="erro" (tentarDeNovo)="carregar()"></ac-estado>
+
+<ng-container *ngIf="c">
+  <div class="cm-card cm-card--pad cm-cert-det" style="margin-bottom:20px">
+    <span class="cm-avatar cm-avatar--g" [style.background]="c.cor">{{ c.sigla }}</span>
+    <div class="cm-cert-det__id">
+      <h1 class="cm-titulo" style="font-size:28px">{{ c.nome }}</h1>
+      <p class="cm-ajuda" style="margin:2px 0 0">{{ c.escopo }}</p>
+    </div>
+    <ac-pilula [texto]="c.status" [estilo]="R.estiloStatusCertificacao(c.status)"></ac-pilula>
+    <div class="cm-acoes">
+      <a class="cm-btn cm-btn--contorno" [routerLink]="'requisitos' | acRota" [queryParams]="{ norma: normaDosRequisitos(c) }"><span class="material-icons" aria-hidden="true">checklist</span> Requisitos</a>
+      <button type="button" class="cm-btn cm-btn--contorno" (click)="editando = true"><span class="material-icons" aria-hidden="true">edit</span> Editar</button>
+      <button type="button" class="cm-btn cm-btn--perigo" title="Excluir" [disabled]="excluindo" (click)="excluir(c)"><span class="material-icons" aria-hidden="true">delete_outline</span></button>
+    </div>
+  </div>
+
+  <section class="cm-indicadores">
+    <div class="cm-card cm-indicador"><div class="cm-indicador__topo">Conformidade geral</div><div class="cm-indicador__valor" [style.color]="c.cor">{{ c.conformidade ?? 0 }}%</div></div>
+    <div class="cm-card cm-indicador"><div class="cm-indicador__topo">Total de requisitos</div><div class="cm-indicador__valor">{{ c.totalRequisitos ?? 0 }}</div></div>
+    <div class="cm-card cm-indicador"><div class="cm-indicador__topo">Próxima auditoria</div><div class="cm-indicador__valor cm-indicador__valor--data">{{ F.data(c.proximaAuditoria) }}</div><div class="cm-indicador__sub">{{ c.organismo }}</div></div>
+    <div class="cm-card cm-indicador"><div class="cm-indicador__topo">Válido até</div><div class="cm-indicador__valor cm-indicador__valor--data">{{ F.data(c.validoAte) }}</div><div class="cm-indicador__sub">Última auditoria: {{ F.data(c.ultimaAuditoria) }}</div></div>
+  </section>
+
+  <section class="cm-stats">
+    <div class="cm-card cm-stat" style="--cor:#1f8a4c"><div class="cm-stat__valor">{{ c.conformes ?? 0 }}</div><div class="cm-stat__rotulo">Conformes</div></div>
+    <div class="cm-card cm-stat" style="--cor:#b8860b"><div class="cm-stat__valor">{{ c.pendentes ?? 0 }}</div><div class="cm-stat__rotulo">Pendentes</div></div>
+    <div class="cm-card cm-stat" style="--cor:#c0392b"><div class="cm-stat__valor">{{ c.naoConformes ?? 0 }}</div><div class="cm-stat__rotulo">Não conformes</div></div>
+  </section>
+
+  <section class="cm-card cm-card--pad">
+    <h2 class="cm-card__titulo"><span class="material-icons" aria-hidden="true">bar_chart</span> Conformidade por Categoria</h2>
+    <p *ngIf="c.categorias.length === 0" class="cm-ajuda">Sem categorias cadastradas. Use "Editar" para incluir.</p>
+    <div *ngFor="let cat of c.categorias" class="cm-catbar">
+      <div class="cm-catbar__topo"><span>{{ cat.nome }}</span><span class="cm-catbar__num">{{ cat.conformes ?? 0 }}/{{ cat.total ?? 0 }} req. <b [style.color]="c.cor">{{ pct(cat) }}%</b></span></div>
+      <div class="cm-barra"><div class="cm-barra__fill" [style.width.%]="min100(pct(cat))" [style.background]="c.cor"></div></div>
+    </div>
+  </section>
+
+  <ac-form-certificacao [aberto]="editando" [certificacao]="c" (fechar)="editando = false" (salvo)="salva()"></ac-form-certificacao>
+</ng-container>

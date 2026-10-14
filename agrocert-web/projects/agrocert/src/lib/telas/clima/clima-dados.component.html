@@ -1,0 +1,78 @@
+<ac-clima-cabecalho aba="dados" [erro]="erro"></ac-clima-cabecalho>
+<ac-estado [carregando]="carregando"></ac-estado>
+<ac-clima-indisponivel *ngIf="indisponivel" [endereco]="endereco" (tentarDeNovo)="carregar()"></ac-clima-indisponivel>
+
+<ng-container *ngIf="!indisponivel">
+  <ng-container *ngIf="c">
+    <div *ngIf="c.simulacao" class="cm-alerta cm-alerta--info" role="status"><span class="material-icons" aria-hidden="true">science</span>
+      <div>
+        <b>Simulação:</b> {{ c.registrosACorrigir }} registro(s) teriam o ENSO recalculado a partir do ONI. Nada foi gravado.
+        <form *ngIf="c.registrosACorrigir > 0" class="cl-inline" (submit)="$event.preventDefault(); aplicar()">
+          <button type="submit" class="cm-btn cm-btn--primario cm-btn--pequeno" [disabled]="gravando" [class.is-carregando]="gravando">
+            <ng-container *ngIf="!gravando"><span class="material-icons" aria-hidden="true">done_all</span> Aplicar correção</ng-container>
+            <ng-container *ngIf="gravando">Gravando...</ng-container>
+          </button>
+        </form>
+      </div>
+    </div>
+    <div *ngIf="!c.simulacao" class="cm-alerta cm-alerta--ok" role="status"><span class="material-icons" aria-hidden="true">check_circle</span><div>{{ c.registrosCorrigidos }} registro(s) corrigidos. A previsão já usa os dados novos.</div></div>
+  </ng-container>
+
+  <ng-container *ngIf="q">
+    <section class="cm-indicadores">
+      <div class="cm-card cm-indicador">
+        <div class="cm-indicador__topo"><span>Registros mensais</span><span class="material-icons" aria-hidden="true">storage</span></div>
+        <div class="cm-indicador__valor">{{ q.registros }}</div>
+        <div class="cm-indicador__sub">{{ q.periodo }}</div>
+      </div>
+      <div class="cm-card cm-indicador">
+        <div class="cm-indicador__topo"><span>ENSO gravado errado</span><span class="material-icons" aria-hidden="true" [style.color]="ensoErrado > 0 ? '#d03b3b' : null">waves</span></div>
+        <div class="cm-indicador__valor">{{ ensoErrado }}</div>
+        <div class="cm-indicador__sub">fase/índice/intensidade diferente do ONI</div>
+      </div>
+      <div class="cm-card cm-indicador">
+        <div class="cm-indicador__topo"><span>Valores fora do padrão</span><span class="material-icons" aria-hidden="true">priority_high</span></div>
+        <div class="cm-indicador__valor">{{ qtd('FORA_DO_PADRAO') + qtd('VALOR_IMPOSSIVEL') }}</div>
+        <div class="cm-indicador__sub">conferir na fonte (estação/planilha)</div>
+      </div>
+      <div class="cm-card cm-indicador">
+        <div class="cm-indicador__topo"><span>Meses faltando / duplicados</span><span class="material-icons" aria-hidden="true">event_busy</span></div>
+        <div class="cm-indicador__valor">{{ qtd('MES_FALTANDO') + qtd('DUPLICADO') }}</div>
+        <div class="cm-indicador__sub">buracos na série atrapalham o ciclo</div>
+      </div>
+    </section>
+
+    <section class="cm-card cl-card cl-acao-enso">
+      <div>
+        <h2>Corrigir o ENSO da base</h2>
+        <p class="cm-ajuda">
+          Recalcula <code>enso_fase</code>, <code>enso_indice</code> e <code>enso_intensidade</code> a partir do ONI com sinal
+          (<code>correcao_fatores_climaticos</code>). Primeiro simule; depois aplique.
+        </p>
+      </div>
+      <form (submit)="$event.preventDefault(); simular()">
+        <button type="submit" class="cm-btn cm-btn--contorno" [disabled]="ensoErrado === 0 || simulando"><span class="material-icons" aria-hidden="true">science</span> Simular correção</button>
+      </form>
+    </section>
+
+    <section class="cm-card cm-tabela-wrap">
+      <div class="cl-card__cab cl-card__cab--pad"><h2>Problemas encontrados</h2><span class="cm-contador">{{ q.totalProblemas }} no total{{ q.totalProblemas > limite ? ' · mostrando ' + limite : '' }}</span></div>
+      <div class="cm-tabela-scroll">
+        <table class="cm-tabela cl-tabela">
+          <thead><tr><th>Mês</th><th>Tipo</th><th>Detalhe</th><th class="cl-num">Id</th></tr></thead>
+          <tbody>
+            <tr *ngIf="q.problemas.length === 0">
+              <td colspan="4" class="cm-tabela__vazio"><span class="material-icons" aria-hidden="true" style="color:#0ca30c;vertical-align:-5px">check_circle</span> Nenhum problema na base.</td>
+            </tr>
+            <tr *ngFor="let pr of problemas">
+              <td class="cl-nowrap"><b>{{ cf.mesAno(pr.mes, pr.ano) }}</b></td>
+              <td class="cl-nowrap"><span class="material-icons" aria-hidden="true" style="font-size:17px;vertical-align:-4px;color:#52514e">{{ icone(pr.tipo) }}</span> {{ cf.nomeProblema(pr.tipo) }}</td>
+              <td>{{ pr.detalhe }}</td>
+              <td class="cl-num">{{ pr.id ?? '—' }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </ng-container>
+</ng-container>

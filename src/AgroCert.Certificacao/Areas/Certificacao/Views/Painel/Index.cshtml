@@ -1,0 +1,118 @@
+@model PainelDto
+@{
+    ViewData["Title"] = "Gestão de Certificações";
+    ViewData["MenuAtivo"] = "cert-gestao";
+    var icones = new Dictionary<string, string> { ["sparkle"] = "workspace_premium", ["alerta"] = "report_problem", ["relogio"] = "schedule", ["vistoria"] = "fact_check" };
+}
+<div class="cert-modulo">
+    <partial name="_Recursos" />
+
+    <div class="cm-topo">
+        <div>
+            <p class="cm-eyebrow">Painel de Controle</p>
+            <h1 class="cm-titulo">@Html.Icone("dashboard") Gestão de Certificações</h1>
+            <p class="cm-subtitulo">Cooperativa Agropecuária do Alto Paranaíba — COOPADAP</p>
+        </div>
+        <div class="cm-acoes">
+            <a class="cm-btn cm-btn--contorno" href="/certificacao/vistorias">@Html.Icone("fact_check") Vistorias</a>
+            <a class="cm-btn cm-btn--primario" href="/certificacao/certificacoes">@Html.Icone("workspace_premium") Certificações ativas</a>
+        </div>
+    </div>
+
+    <section class="cm-indicadores">
+        @foreach (var i in Model.Indicadores)
+        {
+            <div class="cm-card cm-indicador">
+                <div class="cm-indicador__topo"><span>@i.Rotulo</span>@Html.Icone(icones.GetValueOrDefault(i.Icone, "info"), $"color:{i.Cor}")</div>
+                <div class="cm-indicador__valor" style="color:@i.Cor">@i.Valor</div>
+                <div class="cm-indicador__sub">@i.Sub</div>
+            </div>
+        }
+    </section>
+
+    <section class="cm-grade">
+        @foreach (var c in Model.Certificacoes)
+        {
+            var st = Rotulos.EstiloStatusCertificacao(c.Status);
+            <article class="cm-card cm-cert" data-link="/certificacao/certificacoes/@c.Id" tabindex="0" style="cursor:pointer">
+                <div class="cm-cert__topo">
+                    <span class="cm-avatar" style="background:@c.Cor">@c.Sigla</span>
+                    <div class="cm-cert__id">
+                        <div class="cm-cert__nome">@c.Nome</div>
+                        <div class="cm-cert__escopo" title="@c.Escopo">@c.Escopo</div>
+                    </div>
+                    @Html.Pilula(c.Status, st)
+                </div>
+                <div>
+                    <div class="cm-barra-topo"><span>Conformidade geral</span><b style="color:@c.Cor">@(c.Conformidade ?? 0)%</b></div>
+                    <div class="cm-barra"><div class="cm-barra__fill" style="width:@(Math.Clamp(c.Conformidade ?? 0, 0, 100))%;background:@c.Cor"></div></div>
+                </div>
+                <div class="cm-metricas">
+                    <span style="color:#1f8a4c">@Html.Icone("check_circle") @(c.Conformes ?? 0) conformes</span>
+                    <span style="color:#c98a1a">@Html.Icone("pending") @(c.Pendentes ?? 0) pendentes</span>
+                    <span style="color:#c0392b">@Html.Icone("cancel") @(c.NaoConformes ?? 0) NCs</span>
+                </div>
+                <div class="cm-rodape-card">
+                    <span>Próxima auditoria: <b style="color:var(--cm-texto)">@Rotulos.Data(c.ProximaAuditoria)</b></span>
+                    <span>@c.Organismo</span>
+                </div>
+            </article>
+        }
+    </section>
+    @if (Model.Certificacoes.Count == 0)
+    {
+        <div class="cm-vazio">Nenhuma certificação cadastrada. <a href="/certificacao/certificacoes">Cadastrar a primeira</a>.</div>
+    }
+
+    <section class="cm-painel-grid">
+        <div class="cm-card cm-card--pad">
+            <div class="cm-card__cab">
+                <h2 class="cm-card__titulo" style="margin:0">@Html.Icone("priority_high") Ações Prioritárias</h2>
+                <a href="/certificacao/requisitos?status=Pendente">Ver todas →</a>
+            </div>
+            @if (Model.AcoesPrioritarias.Count == 0)
+            {
+                <p class="cm-ajuda">Nenhuma ação pendente no momento.</p>
+            }
+            @foreach (var r in Model.AcoesPrioritarias)
+            {
+                var referencia = r.Referencias.FirstOrDefault();
+                <div class="cm-lista-item">
+                    <div class="cm-lista-item__l1">
+                        <span class="cm-lista-item__titulo">@Html.Pilula(r.Prioridade?.ToUpperInvariant(), Rotulos.EstiloPrioridade(r.Prioridade)) @r.Titulo</span>
+                        <span class="cm-lista-item__data">@Rotulos.DataCurta(r.Prazo)</span>
+                    </div>
+                    <div class="cm-lista-item__l2">
+                        <span>@(referencia is null ? "—" : $"{referencia.Norma} · {referencia.Codigo}")</span>
+                        <span>Resp. @(string.IsNullOrWhiteSpace(r.Responsavel) ? "—" : r.Responsavel)</span>
+                    </div>
+                </div>
+            }
+        </div>
+
+        <div class="cm-card cm-card--pad">
+            <div class="cm-card__cab">
+                <h2 class="cm-card__titulo" style="margin:0">@Html.Icone("fact_check") Pendências de Vistoria</h2>
+                <a href="/certificacao/vistorias/pendencias">Ver todas →</a>
+            </div>
+            @if (Model.PendenciasVistoria.Count == 0)
+            {
+                <p class="cm-ajuda">Nenhuma pendência de vistoria em aberto.</p>
+            }
+            @foreach (var a in Model.PendenciasVistoria)
+            {
+                <div class="cm-lista-item">
+                    <div class="cm-lista-item__l1">
+                        <span class="cm-lista-item__titulo">@Html.Pilula(Rotulos.RotuloGrauRisco(a.GrauRisco), Rotulos.EstiloGrauRisco(a.GrauRisco)) @a.Anomalia</span>
+                        <span class="cm-lista-item__data @(a.DiasRestantes < 0 ? "cm-t-vermelho" : "")">@Rotulos.DataCurta(a.Prazo)</span>
+                    </div>
+                    <div class="cm-lista-item__l2">
+                        <span>@a.VistoriaCodigoDocumento — @a.VistoriaUnidade</span>
+                        <span>Resp. @(string.IsNullOrWhiteSpace(a.ResponsavelExecucao) ? "—" : a.ResponsavelExecucao)</span>
+                    </div>
+                </div>
+            }
+        </div>
+    </section>
+</div>
+<partial name="_Scripts" />

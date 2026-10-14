@@ -1,0 +1,111 @@
+<header class="pt-toolbar">
+  <div class="pt-toolbar__esq">
+    <button type="button" class="toggle-button" aria-label="Mostrar/ocultar menu" (click)="alternarMenu()">
+      <span class="material-icons">menu</span>
+    </button>
+  </div>
+  <a class="pt-logo" routerLink="/" aria-label="Portal Coopadap — Início">
+    <img class="pt-logo__img" src="img/logo-coopadap.png" alt="Coopadap" />
+  </a>
+  <div class="pt-toolbar__dir">
+    <span class="material-icons" title="Notificações">notifications</span>
+    <div class="pt-conta">
+      <button type="button" class="pt-conta__botao" [attr.aria-expanded]="menuUsuario" aria-haspopup="menu" (click)="menuUsuario = !menuUsuario">
+        <span class="pt-usuario">{{ usuario }}</span>
+        <span class="material-icons">keyboard_arrow_down</span>
+      </button>
+      <div class="pt-conta__menu" role="menu" *ngIf="menuUsuario">
+        <button type="button" role="menuitem" *ngIf="app.disponivel" (click)="instalar()"><span class="material-icons">install_mobile</span> Instalar app</button>
+        <button type="button" role="menuitem" (click)="sair()"><span class="material-icons">logout</span> Sair</button>
+      </div>
+    </div>
+  </div>
+</header>
+
+<div class="pt-corpo">
+  <nav class="pt-sidenav" aria-label="Menu principal">
+    <a class="menu-item entry" routerLink="/" routerLinkActive="active-menu-item" [routerLinkActiveOptions]="{ exact: true }">
+      <span class="material-icons">home</span><span class="menu-text menu-group-title">Início</span>
+    </a>
+    <hr class="mat-divider" />
+
+    <div class="menu-grupo" [class.is-aberto]="aberto['atendimentos']">
+      <button type="button" class="menu-item entry" [attr.aria-expanded]="aberto['atendimentos']" (click)="alternar('atendimentos')">
+        <span class="material-icons">label_important</span>
+        <span class="menu-text menu-group-title">Atendimentos</span>
+        <span class="material-icons menu-seta">keyboard_arrow_down</span>
+      </button>
+      <div class="submenu-container">
+        <a class="menu-item entry" [routerLink]="'/' + m.MEU_ESTOQUE.caminho" routerLinkActive="active-menu-item"><span class="material-icons">{{ m.MEU_ESTOQUE.icone }}</span><span class="menu-text menu-route-text">{{ m.MEU_ESTOQUE.texto }}</span></a>
+        <a class="menu-item entry" [routerLink]="'/' + m.MINHAS_VENDAS.caminho" routerLinkActive="active-menu-item"><span class="material-icons">{{ m.MINHAS_VENDAS.icone }}</span><span class="menu-text menu-route-text">{{ m.MINHAS_VENDAS.texto }}</span></a>
+
+        <div class="menu-grupo" [class.is-aberto]="aberto['planejamento']">
+          <button type="button" class="menu-item entry" [attr.aria-expanded]="aberto['planejamento']" (click)="alternar('planejamento')">
+            <span class="material-icons">task</span><span class="menu-text menu-route-text">Planejamento Agrícola</span><span class="material-icons menu-seta">keyboard_arrow_down</span>
+          </button>
+          <div class="submenu-container">
+            <a *ngFor="let i of m.PLANEJAMENTO" class="menu-item entry submenu-item" [routerLink]="'/' + i.caminho" routerLinkActive="active-menu-item">
+              <span class="material-icons">{{ i.icone }}</span><span class="menu-text menu-route-text">{{ i.texto }}</span>
+            </a>
+          </div>
+        </div>
+
+        <a class="menu-item entry" [routerLink]="'/' + m.RELATORIOS.caminho" routerLinkActive="active-menu-item"><span class="material-icons">{{ m.RELATORIOS.icone }}</span><span class="menu-text menu-route-text">{{ m.RELATORIOS.texto }}</span></a>
+        <a class="menu-item entry" [routerLink]="'/' + m.ROMANEIO.caminho" routerLinkActive="active-menu-item"><span class="material-icons">{{ m.ROMANEIO.icone }}</span><span class="menu-text menu-route-text">{{ m.ROMANEIO.texto }}</span></a>
+
+        <div class="menu-grupo" [class.is-aberto]="aberto['servicos']">
+          <button type="button" class="menu-item entry" [attr.aria-expanded]="aberto['servicos']" (click)="alternar('servicos')">
+            <span class="material-icons">engineering</span><span class="menu-text menu-route-text">Serviços</span><span class="material-icons menu-seta">keyboard_arrow_down</span>
+          </button>
+          <div class="submenu-container">
+            <a *ngFor="let i of m.SERVICOS" class="menu-item entry submenu-item" [routerLink]="'/' + i.caminho" routerLinkActive="active-menu-item">
+              <span class="material-icons">{{ i.icone }}</span><span class="menu-text menu-route-text">{{ i.texto }}</span>
+            </a>
+          </div>
+        </div>
+
+        <a class="menu-item entry" [routerLink]="'/' + m.VISITA_TECNICA.caminho" routerLinkActive="active-menu-item"><span class="material-icons">{{ m.VISITA_TECNICA.icone }}</span><span class="menu-text menu-route-text">{{ m.VISITA_TECNICA.texto }}</span></a>
+
+        <ac-menu-certificacao></ac-menu-certificacao>
+        <ac-menu-clima></ac-menu-clima>
+      </div>
+    </div>
+    <hr class="mat-divider" />
+
+    <div class="menu-grupo" [class.is-aberto]="aberto['comunicacao']">
+      <button type="button" class="menu-item entry" [attr.aria-expanded]="aberto['comunicacao']" (click)="alternar('comunicacao')">
+        <span class="material-icons">chat</span>
+        <span class="menu-text menu-group-title">Comunicação</span>
+        <span class="material-icons menu-seta">keyboard_arrow_down</span>
+      </button>
+      <div class="submenu-container">
+        <a *ngFor="let i of m.COMUNICACAO" class="menu-item entry" [routerLink]="'/' + i.caminho" routerLinkActive="active-menu-item">
+          <span class="material-icons">{{ i.icone }}</span><span class="menu-text menu-route-text">{{ i.texto }}</span>
+        </a>
+      </div>
+    </div>
+  </nav>
+
+  <main class="pt-conteudo" id="conteudo">
+    <router-outlet></router-outlet>
+  </main>
+</div>
+
+<div class="pt-aviso-versao" role="status" *ngIf="app.versaoNova">
+  <span class="material-icons">system_update</span>
+  <span>Nova versão do portal disponível.</span>
+  <button type="button" (click)="app.atualizar()">Atualizar</button>
+</div>
+
+<div class="pt-modal-fundo" *ngIf="ajudaIos" (click)="ajudaIos = false">
+  <div class="pt-modal pt-ajuda-ios" role="dialog" aria-modal="true" aria-labelledby="ajuda-ios-titulo" (click)="$event.stopPropagation()">
+    <h2 id="ajuda-ios-titulo"><img src="icones/icon-192.png" alt="" /> Instalar o Portal Coopadap</h2>
+    <ol>
+      <li>Abra o portal no <b>Safari</b>.</li>
+      <li>Toque em <b>Compartilhar</b> <span class="material-icons" aria-label="ícone compartilhar">ios_share</span> na barra de baixo.</li>
+      <li>Role e toque em <b>Adicionar à Tela de Início</b> <span class="material-icons" aria-hidden="true">add_box</span>.</li>
+      <li>Toque em <b>Adicionar</b>. O ícone do portal aparece junto dos seus apps.</li>
+    </ol>
+    <div class="pt-acoes-centro"><button type="button" class="pt-btn pt-btn--verde" (click)="ajudaIos = false">Entendi</button></div>
+  </div>
+</div>

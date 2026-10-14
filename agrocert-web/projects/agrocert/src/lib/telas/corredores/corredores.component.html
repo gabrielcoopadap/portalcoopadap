@@ -1,0 +1,258 @@
+<div class="co-modulo">
+  <div class="cm-topo">
+<div>
+  <h1 class="cm-titulo"><span class="material-icons" aria-hidden="true">park</span> Corredores Ecológicos</h1>
+  <p class="cm-subtitulo">Matas interligadas nas fazendas dos cooperados — CAR (SICAR) + mapas de vegetação do MapBiomas</p>
+</div>
+<div class="co-atualizado" *ngIf="situacao?.temDados"><span class="material-icons" aria-hidden="true">update</span> Estudo gerado em {{ atualizadoEm }}</div>
+  </div>
+
+  <div *ngIf="carregando" class="ac-carregando" role="status"><span class="ac-giro" aria-hidden="true"></span> Carregando...</div>
+  <div *ngIf="erroSituacao" class="cm-alerta cm-alerta--erro" role="alert"><span class="material-icons" aria-hidden="true">error_outline</span><div>{{ erroSituacao }}</div></div>
+
+  <ng-container *ngIf="situacao && !situacao.temDados">
+<div *ngIf="situacao.erro" class="cm-alerta cm-alerta--erro"><span class="material-icons" aria-hidden="true">error_outline</span><div>{{ situacao.erro }}</div></div>
+<div class="cm-card cm-card--pad co-sem-dados">
+  <h2 class="cm-card__titulo"><span class="material-icons" aria-hidden="true">info</span> O estudo ainda não foi gerado</h2>
+  <p>Esta tela mostra o resultado do processamento dos mapas. Para gerar, na pasta <b>AgroCert</b>:</p>
+  <ol>
+    <li>Coloque na pasta <code>dados-corredores</code> a planilha dos cooperados (.xlsx com os CAR), os GeoPackages do SICAR e os mapas do MapBiomas.</li>
+    <li>Se os mapas do MapBiomas forem do Brasil inteiro, recorte a região:<br /><code>dotnet run -c Release --project ferramentas\RecortarMapBiomas -- dados-corredores</code></li>
+    <li>Processe os corredores:<br /><code>dotnet run -c Release --project ferramentas\ProcessarCorredores -- dados-corredores</code></li>
+  </ol>
+  <p class="cm-ajuda">Pasta onde o portal procura o resultado: <code>{{ situacao.pasta }}</code> (configurável em <code>AgroCert:Corredores:Pasta</code>).</p>
+</div>
+  </ng-container>
+
+  <div *ngIf="erroEstudo" class="cm-alerta cm-alerta--erro"><span class="material-icons" aria-hidden="true">error_outline</span><div>Não foi possível carregar o estudo (corredores.json).</div></div>
+
+  <div id="co-app" *ngIf="dados as d">
+<div class="cm-card co-controles">
+  <div class="co-controle" [hidden]="d.regioes.length <= 1">
+    <label class="co-controle__rotulo" for="co-regiao">Região</label>
+    <select id="co-regiao" class="cm-select" (change)="trocarRegiaoPor($any($event.target).value)">
+      <option *ngFor="let r of d.regioes; let i = index" [value]="i" [selected]="i === estado.regiao">{{ r.nome }} ({{ r.fazendas.length }}{{ r.fazendas.length === 1 ? ' fazenda)' : ' fazendas)' }}</option>
+    </select>
+  </div>
+  <div class="co-controle">
+    <span class="co-controle__rotulo">Ano</span>
+    <div class="cm-opcoes co-opcoes" role="radiogroup" aria-label="Ano">
+      <ng-container *ngFor="let o of opcoesAno; let i = index">
+        <input type="radio" name="co-ano" [id]="'co-ano-' + i" [value]="o.v" [checked]="estado.ano === o.v" (change)="escolher('ano', o.v)" />
+        <label [attr.for]="'co-ano-' + i">{{ o.t }}</label>
+      </ng-container>
+    </div>
+  </div>
+  <div class="co-controle">
+    <span class="co-controle__rotulo">Que vegetação conta</span>
+    <div class="cm-opcoes co-opcoes" role="radiogroup" aria-label="Vegetação">
+      <ng-container *ngFor="let o of opcoesVeg; let i = index">
+        <input type="radio" name="co-veg" [id]="'co-veg-' + i" [value]="o.v" [checked]="estado.veg === o.v" (change)="escolher('veg', o.v)" />
+        <label [attr.for]="'co-veg-' + i" [attr.title]="o.title || null">{{ o.t }}</label>
+      </ng-container>
+    </div>
+  </div>
+  <div class="co-controle">
+    <span class="co-controle__rotulo">Distância que os animais atravessam
+      <span class="material-icons co-dica" tabindex="0" title="Duas matas separadas por uma falha menor que essa distância (pasto, lavoura, estrada) contam como ligadas. 100 m é rigoroso (bugios, aves de mata); 500 m é permissivo (bichos que andam em área aberta, como o lobo-guará).">help_outline</span>
+    </span>
+    <div class="cm-opcoes co-opcoes" role="radiogroup" aria-label="Distância">
+      <ng-container *ngFor="let o of opcoesDist; let i = index">
+        <input type="radio" name="co-dist" [id]="'co-dist-' + i" [value]="o.v" [checked]="'' + estado.dist === o.v" (change)="escolher('dist', o.v)" />
+        <label [attr.for]="'co-dist-' + i">{{ o.t }}</label>
+      </ng-container>
+    </div>
+  </div>
+</div>
+
+<div class="cm-stats co-kpis" aria-live="polite">
+  <div class="cm-card cm-stat" *ngFor="let k of kpis" [style.--cor]="k.cor">
+    <div class="cm-stat__valor">{{ k.valor }}</div>
+    <div class="cm-stat__rotulo">{{ k.rotulo }}</div>
+    <div class="co-stat-sub" *ngIf="k.sub">{{ k.sub }}</div>
+  </div>
+</div>
+
+<div class="cm-card co-mapa-card">
+  <div class="co-mapa-topo">
+    <div class="co-legenda">
+      <ng-container *ngIf="comparando(); else legendaCenario">
+        <span class="co-leg"><i class="co-cor" [style.background]="d.paleta.perda"></i>{{ cap(nomeVeg()) }} perdida desde {{ anoInicial() }}</span>
+        <span class="co-leg"><i class="co-cor" [style.background]="d.paleta.ganho"></i>Voltou (regenerou)</span>
+        <span class="co-leg"><i class="co-cor" [style.background]="d.paleta.estavel" style="opacity:.5"></i>Continua de pé</span>
+      </ng-container>
+      <ng-template #legendaCenario>
+        <span class="co-leg-titulo">Cada cor é um corredor (matas ligadas):</span>
+        <span class="co-leg" *ngFor="let k of cen.corredores.slice(0, 4)"><i class="co-cor" [style.background]="k.cor"></i>Corredor {{ k.numero }} · {{ ha(k.ha) }}</span>
+        <span class="co-leg-mais" *ngIf="cen.corredores.length > 4">+ {{ cen.corredores.length - 4 }} corredores</span>
+        <span class="co-leg"><i class="co-cor" [style.background]="d.paleta.isolado"></i>Fragmento isolado</span>
+        <span class="co-leg"><i class="co-leg-linha"></i>Ponto de ligação (restaurar)</span>
+        <span class="co-leg"><i class="co-leg-rl"></i>Reserva Legal</span>
+        <span class="co-leg"><i class="co-leg-limite"></i>Limite da fazenda</span>
+      </ng-template>
+      <ng-container *ngIf="reg.lei">
+        <span class="co-leg"><i class="co-hach co-hach--app"></i>APP a recompor (CAR)</span>
+        <span class="co-leg"><i class="co-hach co-hach--rl"></i>Reserva Legal sem vegetação</span>
+      </ng-container>
+    </div>
+    <div class="co-camadas">
+      <label class="cm-check"><input type="checkbox" checked (change)="alternarCamada('rl', $any($event.target).checked)" /> Limites e Reservas Legais</label>
+      <label class="cm-check"><input type="checkbox" checked (change)="alternarCamada('fazendas', $any($event.target).checked)" /> Fazendas</label>
+      <label class="cm-check"><input type="checkbox" checked (change)="alternarCamada('ligacoes', $any($event.target).checked)" /> Pontos de ligação</label>
+      <label class="cm-check"><input type="checkbox" checked (change)="alternarCamada('lei', $any($event.target).checked)" /> O que a lei exige recompor</label>
+    </div>
+  </div>
+  <div class="co-mapa" #mapaEl role="region" aria-label="Mapa dos corredores ecológicos"></div>
+  <p class="co-mapa-dica"><span class="material-icons" aria-hidden="true">touch_app</span> Clique numa mata do mapa para ver o tamanho do corredor, ou numa fazenda para ver os dados dela.</p>
+</div>
+
+<div class="cm-abas co-abas" role="tablist">
+  <button type="button" class="cm-aba" role="tab" [class.is-ativa]="estado.aba === 'fazendas'" [attr.aria-selected]="estado.aba === 'fazendas'" (click)="estado.aba = 'fazendas'"><span class="material-icons" aria-hidden="true">agriculture</span> Por fazenda</button>
+  <button type="button" class="cm-aba" role="tab" [class.is-ativa]="estado.aba === 'ligacoes'" [attr.aria-selected]="estado.aba === 'ligacoes'" (click)="estado.aba = 'ligacoes'"><span class="material-icons" aria-hidden="true">link</span> Onde restaurar</button>
+  <button type="button" class="cm-aba" role="tab" [class.is-ativa]="estado.aba === 'corredores'" [attr.aria-selected]="estado.aba === 'corredores'" (click)="estado.aba = 'corredores'"><span class="material-icons" aria-hidden="true">forest</span> Corredores</button>
+  <button type="button" class="cm-aba" role="tab" [class.is-ativa]="estado.aba === 'metodo'" [attr.aria-selected]="estado.aba === 'metodo'" (click)="estado.aba = 'metodo'"><span class="material-icons" aria-hidden="true">menu_book</span> Como foi calculado</button>
+</div>
+
+<section class="co-painel" [hidden]="estado.aba !== 'fazendas'">
+  <div class="co-painel-topo">
+    <div class="cm-busca"><span class="material-icons">search</span><input id="co-busca" class="cm-input" placeholder="Buscar fazenda, produtor ou CAR" [value]="estado.busca" (input)="buscar($any($event.target).value)" /></div>
+    <button type="button" class="cm-btn cm-btn--contorno cm-btn--pequeno" (click)="baixarCsv()"><span class="material-icons" aria-hidden="true">download</span> Baixar planilha (CSV)</button>
+  </div>
+  <div class="cm-card cm-tabela-wrap"><div class="cm-tabela-scroll"><table class="cm-tabela co-tabela">
+    <thead><tr>
+      <ng-container *ngFor="let c of colunas; let i = index">
+        <th *ngIf="c.k; else thVazio" class="co-ordenavel" [class.co-num]="c.n" tabindex="0" (click)="ordenar(i)" (keydown.enter)="ordenar(i)">{{ c.t }}{{ estado.ordem && estado.ordem.i === i ? (estado.ordem.dir > 0 ? ' ▲' : ' ▼') : '' }}</th>
+        <ng-template #thVazio><th></th></ng-template>
+      </ng-container>
+    </tr></thead>
+    <tbody>
+      <tr *ngFor="let x of linhas" class="is-clicavel" (click)="irParaFazenda(x.f)">
+        <td *ngFor="let c of colunas" [class.co-num]="c.n" [ngSwitch]="c.id">
+          <ng-container *ngSwitchCase="'nome'"><div class="cm-t-titulo">{{ x.f.nome }}</div><div class="cm-t-sub">{{ x.f.municipio }} · {{ ha(x.f.areaHa) }}</div></ng-container>
+          <ng-container *ngSwitchCase="'vegA'">{{ ha(x.a!.nativaHa) }}</ng-container>
+          <ng-container *ngSwitchCase="'vegB'">{{ ha(x.s.nativaHa) }}</ng-container>
+          <ng-container *ngSwitchCase="'perda'"><b *ngIf="x.m!.perdaHa >= 0.5; else traco" class="co-perda">{{ ha(x.m!.perdaHa) }}</b></ng-container>
+          <ng-container *ngSwitchCase="'ganho'"><b *ngIf="x.m!.ganhoHa >= 0.5; else traco" class="co-ganho">{{ ha(x.m!.ganhoHa) }}</b></ng-container>
+          <ng-container *ngSwitchCase="'emCorredorAB'">{{ pct(x.a!.emCorredorHa, x.a!.nativaHa) }} → {{ pct(x.s.emCorredorHa, x.s.nativaHa) }}</ng-container>
+          <ng-container *ngSwitchCase="'rlA'"><span [class]="'co-sit ' + sit(x.a!.situacaoRl).c">{{ sit(x.a!.situacaoRl).t }}</span></ng-container>
+          <ng-container *ngSwitchCase="'rlB'"><span [class]="'co-sit ' + sit(x.s.situacaoRl).c">{{ sit(x.s.situacaoRl).t }}</span></ng-container>
+          <ng-container *ngSwitchCase="'veg'">{{ ha(x.s.nativaHa) }}<div class="cm-t-sub">{{ pct(x.s.nativaHa, x.f.areaHa) }} da fazenda</div></ng-container>
+          <ng-container *ngSwitchCase="'emCorredor'">
+            <ng-container *ngIf="x.s.nativaHa > 0; else traco"><div class="co-barra"><i [style.width.%]="round(x.s.emCorredorHa / x.s.nativaHa * 100)"></i></div>{{ pct(x.s.emCorredorHa, x.s.nativaHa) }}</ng-container>
+          </ng-container>
+          <ng-container *ngSwitchCase="'maior'">
+            <span *ngIf="!x.s.corredor" class="cm-t-sub">nenhum</span>
+            <ng-container *ngIf="x.s.corredor"><i class="co-cor" [style.background]="corDe(x.s.corredor)"></i> nº {{ x.s.corredor }}<div class="cm-t-sub">{{ ha(x.s.corredorHa) }}</div></ng-container>
+          </ng-container>
+          <ng-container *ngSwitchCase="'rl'"><span [class]="'co-sit ' + sit(x.s.situacaoRl).c">{{ sit(x.s.situacaoRl).t }}</span><div class="cm-t-sub" *ngIf="x.f.rlHa > 0">{{ ha(x.f.rlHa) }} declarados · {{ pct(x.s.rlNativaHa, x.f.rlHa) }} com {{ nomeVeg() }}</div></ng-container>
+          <ng-container *ngSwitchCase="'lei'">
+            <ng-container *ngIf="x.f.appRecomporHa + x.f.rlSemVegetacaoHa >= 0.5; else traco"><b>{{ ha(x.f.appRecomporHa + x.f.rlSemVegetacaoHa) }}</b><div class="cm-t-sub">APP {{ ha(x.f.appRecomporHa) }} · RL {{ ha(x.f.rlSemVegetacaoHa) }}</div></ng-container>
+          </ng-container>
+          <ng-container *ngSwitchCase="'restaurar'">
+            <span *ngIf="!(x.s.ligacoes || []).length" class="cm-t-sub">nenhuma ligação perto</span>
+            <ng-container *ngIf="(x.s.ligacoes || []).length">
+              <span [class]="'co-sit ' + (naFazenda(x.s) ? 'co-sit--lig' : 'co-sit--nada')"><span class="material-icons" aria-hidden="true">link</span> {{ naFazenda(x.s) ? naFazenda(x.s) + ' na fazenda' : x.s.ligacoes.length + ' a até 1,5 km' }}</span>
+              <div class="cm-t-sub co-lei-txt" *ngIf="algumaLegal(x.s)"><span class="material-icons" aria-hidden="true">gavel</span> já é obrigação legal</div>
+            </ng-container>
+          </ng-container>
+          <ng-container *ngSwitchCase="'relatorio'">
+            <a class="co-rel-link" [routerLink]="['corredores', 'relatorio', reg.id, x.f.id] | acRota" [queryParams]="{ veg: estado.veg, dist: estado.dist }"
+               target="_blank" rel="noopener" title="Relatório da fazenda (PDF)" (click)="$event.stopPropagation()"><span class="material-icons" aria-hidden="true">picture_as_pdf</span></a>
+          </ng-container>
+        </td>
+      </tr>
+      <tr *ngIf="!linhas.length"><td class="cm-tabela__vazio" [attr.colspan]="colunas.length">Nenhuma fazenda encontrada.</td></tr>
+    </tbody>
+  </table></div></div>
+</section>
+
+<section class="co-painel" [hidden]="estado.aba !== 'ligacoes'">
+  <p class="co-texto">Trechos curtos sem mata que, se restaurados (plantio ou regeneração), <b>ligam dois corredores</b>. Estão em ordem de prioridade: unem mais mata com a menor distância — e sobem na lista quando o trecho <b>já é APP a recompor ou Reserva Legal sem vegetação</b> (o dono já tem obrigação de restaurar; marcados em azul no mapa).</p>
+  <div class="cm-card cm-tabela-wrap"><div class="cm-tabela-scroll"><table class="cm-tabela co-tabela">
+    <thead><tr><th>Nº</th><th>Liga os corredores</th><th class="co-num">Falha a restaurar</th><th class="co-num">Corredor unido</th><th>Já é obrigação legal?</th><th>Fazendas no trecho</th></tr></thead>
+    <tbody>
+      <tr *ngFor="let l of cen.ligacoes; let i = index" class="is-clicavel" (click)="irParaLigacao(i)">
+        <td><span class="co-lig-num co-lig-num--tab" [class.co-lig-num--lei]="legal(l)">{{ i + 1 }}</span></td>
+        <td><i *ngIf="cen.corredores[l.de - 1] as k" class="co-cor" [style.background]="k.cor"></i> nº {{ l.de }} ({{ ha(l.deHa) }})<br /><i *ngIf="cen.corredores[l.para - 1] as k" class="co-cor" [style.background]="k.cor"></i> nº {{ l.para }} ({{ ha(l.paraHa) }})</td>
+        <td class="co-num"><b>{{ num(l.distanciaM) }} m</b></td>
+        <td class="co-num">{{ ha(l.juntosHa) }}</td>
+        <td>
+          <span *ngIf="!l.leiTipo || l.leiPct <= 0" class="cm-t-sub">não</span>
+          <span *ngIf="l.leiTipo && l.leiPct > 0" [class]="'co-sit ' + (legal(l) ? 'co-sit--lei' : 'co-sit--lei-parcial')"><span class="material-icons" aria-hidden="true">gavel</span> {{ l.leiPct }}% {{ l.leiTipo === 'app' ? 'APP' : l.leiTipo === 'rl' ? 'RL' : 'APP + RL' }}</span>
+        </td>
+        <td>
+          <div class="cm-t-titulo" *ngIf="l.fazendas.length"><ng-container *ngFor="let f of l.fazendas; let u = last">{{ reg.fazendas[f].nome }}<br *ngIf="!u" /></ng-container></div>
+          <div class="cm-t-sub" *ngIf="l.outrosImoveis">{{ l.outrosImoveis }} imóvel(is) de não cooperados</div>
+          <span class="cm-t-sub" *ngIf="!l.fazendas.length && !l.outrosImoveis">fora de imóveis do CAR</span>
+        </td>
+      </tr>
+      <tr *ngIf="!cen.ligacoes.length"><td class="cm-tabela__vazio" colspan="6">Nenhuma falha de até {{ num(d.parametros.ligacaoMaxM) }} m entre corredores nesta combinação.</td></tr>
+    </tbody>
+  </table></div></div>
+</section>
+
+<section class="co-painel" [hidden]="estado.aba !== 'corredores'">
+  <p class="co-texto">Cada corredor é um conjunto de matas ligadas entre si. Clique numa linha para ver no mapa.</p>
+  <div class="cm-card cm-tabela-wrap"><div class="cm-tabela-scroll"><table class="cm-tabela co-tabela">
+    <thead><tr><th>Corredor</th><th class="co-num">Tamanho</th><th>Tipo</th><th class="co-num">% da {{ nomeVeg() }}</th><th>Fazendas de cooperados</th></tr></thead>
+    <tbody>
+      <tr *ngFor="let k of cen.corredores.slice(0, 60)" class="is-clicavel" (click)="irParaCorredor(k)">
+        <td><i class="co-cor co-cor--g" [style.background]="k.cor"></i> <b>nº {{ k.numero }}</b></td>
+        <td class="co-num"><b>{{ ha(k.ha) }}</b></td>
+        <td>{{ classe(k.ha) }}</td>
+        <td class="co-num">{{ pct(k.ha, cen.nativaHa) }}</td>
+        <td><ng-container *ngIf="k.fazendas.length; else nenhuma">{{ k.fazendas.length }}: {{ nomesFazendas(k) }}{{ k.fazendas.length > 4 ? '…' : '' }}</ng-container></td>
+      </tr>
+      <tr *ngIf="cen.corredores.length > 60"><td colspan="5" class="cm-t-sub">+ {{ cen.corredores.length - 60 }} corredores menores</td></tr>
+      <tr>
+        <td><i class="co-cor co-cor--g" [style.background]="d.paleta.isolado"></i> <b>Fragmentos isolados</b></td>
+        <td class="co-num">{{ ha(cen.isolados.ha) }}</td>
+        <td>{{ num(cen.isolados.quantidade) }} matas pequenas soltas</td>
+        <td class="co-num">{{ pct(cen.isolados.ha, cen.nativaHa) }}</td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table></div></div>
+</section>
+
+<section class="co-painel" [hidden]="estado.aba !== 'metodo'">
+  <div class="cm-card cm-card--pad co-metodo">
+    <h3>O que é um corredor ecológico aqui</h3>
+    <p>É um conjunto de matas que estão <b>encostadas ou muito perto umas das outras</b>, de modo que os animais conseguem passar de uma para outra.
+      A distância escolhida no topo da tela ({{ d.distancias.join(', ') }} m) é o maior trecho aberto — pasto, lavoura, estrada — que se considera que eles atravessam.</p>
+    <ul>
+      <li><b>Corredor</b>: conjunto ligado com pelo menos {{ num(d.parametros.corredorMinHa) }} ha de vegetação. Cada corredor tem uma cor no mapa.</li>
+      <li><b>Fragmento isolado</b> (laranja): mata pequena, sem ligação com nenhum corredor.</li>
+      <li><b>Ponto de ligação</b> (linha amarela): o menor trecho sem mata entre dois corredores, até {{ num(d.parametros.ligacaoMaxM) }} m. Restaurar esse trecho une os dois. Estão em ordem de ganho (mais mata unida por metro restaurado).</li>
+      <li><b>O que a lei já exige</b> (hachurado): <b>APP a recompor</b> é a APP que o próprio CAR marca como sem vegetação;
+        <b>Reserva Legal sem vegetação</b> é a parte da RL declarada que o MapBiomas não mostra com vegetação nativa em {{ anoLeiMetodo }}.
+        Pontos de ligação que passam por essas áreas sobem na prioridade (até o dobro), porque o produtor restauraria de qualquer jeito — e ainda une dois corredores.</li>
+      <li><b>Reserva Legal ligada</b>: pelo menos metade da vegetação da RL da fazenda está dentro de um corredor.
+        “Isolada” quer dizer que a RL tem vegetação, mas solta. “RL sem mata” quer dizer que menos de 20% da RL declarada tem vegetação no mapa.</li>
+    </ul>
+    <h3>De onde vêm os dados</h3>
+    <ul>
+      <li><b>Vegetação</b>: MapBiomas (mapa de cobertura e uso da terra, pixels de 30 m), anos {{ d.anos.join(' e ') }}.
+        “Só matas” usa a classe Formação Florestal; “Toda vegetação nativa” soma também cerrado (savana), campo nativo e áreas úmidas.</li>
+      <li><b>Fazendas e Reservas Legais</b>: CAR (SICAR), cruzado com a planilha de cooperados — {{ d.cooperados.comMapa }} de {{ d.cooperados.naPlanilha }} CAR encontrados nos mapas baixados.</li>
+      <li>O estudo cobre as fazendas dos cooperados mais {{ num(d.parametros.bufferRegiaoM / 1000) }} km em volta, porque os corredores atravessam as divisas.</li>
+    </ul>
+    <h3>Cuidados na leitura</h3>
+    <ul>
+      <li>O mapa de 30 m não enxerga matas ciliares muito estreitas (menos de ~30 m de largura) — alguns corredores reais podem aparecer quebrados.</li>
+      <li>Os números são estimativas para planejamento; para laudo ou certificação, confirme em campo.</li>
+    </ul>
+    <p class="cm-ajuda">Estudo gerado em {{ geradoEm }}.</p>
+  </div>
+</section>
+
+<div class="co-avisos">
+  <div class="cm-alerta cm-alerta--info" *ngIf="d.avisos?.length">
+    <span class="material-icons" aria-hidden="true">info</span>
+    <div><b>Observações sobre os dados</b><ul><li *ngFor="let a of d.avisos">{{ a }}</li></ul></div>
+  </div>
+</div>
+  </div>
+</div>
+<ng-template #traco>—</ng-template>
+<ng-template #nenhuma><span class="cm-t-sub">nenhuma</span></ng-template>

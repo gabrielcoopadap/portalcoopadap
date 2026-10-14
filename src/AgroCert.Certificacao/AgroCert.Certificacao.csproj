@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk.Razor">
+  <!--
+    Módulo "Certificação" como Razor Class Library (Area "Certificacao"): telas MVC, API REST,
+    CSS/JS (servidos em /_content/AgroCert.Certificacao/...) e o item de menu. O portal (ou o
+    host de teste) só referencia este projeto e chama AddModuloCertificacao()/UseModuloCertificacao().
+  -->
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AddRazorSupportForMvc>true</AddRazorSupportForMvc>
+    <RootNamespace>AgroCert.Certificacao</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\AgroCert.Application\AgroCert.Application.csproj" />
+    <ProjectReference Include="..\AgroCert.Infrastructure\AgroCert.Infrastructure.csproj" />
+  </ItemGroup>
+</Project>

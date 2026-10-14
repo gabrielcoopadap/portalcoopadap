@@ -1,0 +1,118 @@
+@using AgroCert.Certificacao.Controllers.Telas
+@model CorredoresViewModel
+@{
+    ViewData["Title"] = "Corredores Ecológicos";
+    ViewData["MenuAtivo"] = "cert-corredores";
+}
+<link rel="stylesheet" href="~/_content/AgroCert.Certificacao/lib/leaflet/leaflet.css" />
+<link rel="stylesheet" href="~/_content/AgroCert.Certificacao/css/corredores.css" asp-append-version="true" />
+<div class="cert-modulo co-modulo">
+    <partial name="_Recursos" />
+
+    <div class="cm-topo">
+        <div>
+            <h1 class="cm-titulo">@Html.Icone("park") Corredores Ecológicos</h1>
+            <p class="cm-subtitulo">Matas interligadas nas fazendas dos cooperados — CAR (SICAR) + mapas de vegetação do MapBiomas</p>
+        </div>
+        @if (Model.TemDados)
+        {
+            <div class="co-atualizado">@Html.Icone("update") Estudo gerado em @Model.AtualizadoEm?.ToString("dd/MM/yyyy 'às' HH:mm")</div>
+        }
+    </div>
+
+    @if (!Model.TemDados)
+    {
+        @if (Model.Erro is not null)
+        {
+            <div class="cm-alerta cm-alerta--erro">@Html.Icone("error_outline")<div>@Model.Erro</div></div>
+        }
+        <div class="cm-card cm-card--pad co-sem-dados">
+            <h2 class="cm-card__titulo">@Html.Icone("info") O estudo ainda não foi gerado</h2>
+            <p>Esta tela mostra o resultado do processamento dos mapas. Para gerar, na pasta <b>AgroCert</b>:</p>
+            <ol>
+                <li>Coloque na pasta <code>dados-corredores</code> a planilha dos cooperados (.xlsx com os CAR), os GeoPackages do SICAR e os mapas do MapBiomas.</li>
+                <li>Se os mapas do MapBiomas forem do Brasil inteiro, recorte a região:<br /><code>dotnet run -c Release --project ferramentas\RecortarMapBiomas -- dados-corredores</code></li>
+                <li>Processe os corredores:<br /><code>dotnet run -c Release --project ferramentas\ProcessarCorredores -- dados-corredores</code></li>
+            </ol>
+            <p class="cm-ajuda">Pasta onde o portal procura o resultado: <code>@Model.Pasta</code> (configurável em <code>AgroCert:Corredores:Pasta</code>).</p>
+        </div>
+    }
+    else
+    {
+        <div id="co-app" data-base="/certificacao/corredores/arquivo/">
+            <div class="cm-card co-controles">
+                <div class="co-controle" id="co-ctl-regiao" hidden>
+                    <label class="co-controle__rotulo" for="co-regiao">Região</label>
+                    <select id="co-regiao" class="cm-select"></select>
+                </div>
+                <div class="co-controle">
+                    <span class="co-controle__rotulo">Ano</span>
+                    <div class="cm-opcoes co-opcoes" id="co-ano" role="radiogroup" aria-label="Ano"></div>
+                </div>
+                <div class="co-controle">
+                    <span class="co-controle__rotulo">Que vegetação conta</span>
+                    <div class="cm-opcoes co-opcoes" id="co-veg" role="radiogroup" aria-label="Vegetação"></div>
+                </div>
+                <div class="co-controle">
+                    <span class="co-controle__rotulo">Distância que os animais atravessam
+                        <span class="material-icons co-dica" tabindex="0" title="Duas matas separadas por uma falha menor que essa distância (pasto, lavoura, estrada) contam como ligadas. 100 m é rigoroso (bugios, aves de mata); 500 m é permissivo (bichos que andam em área aberta, como o lobo-guará).">help_outline</span>
+                    </span>
+                    <div class="cm-opcoes co-opcoes" id="co-dist" role="radiogroup" aria-label="Distância"></div>
+                </div>
+            </div>
+
+            <div class="cm-stats co-kpis" id="co-kpis" aria-live="polite"></div>
+
+            <div class="cm-card co-mapa-card">
+                <div class="co-mapa-topo">
+                    <div class="co-legenda" id="co-legenda"></div>
+                    <div class="co-camadas">
+                        <label class="cm-check"><input type="checkbox" data-camada="rl" checked /> Limites e Reservas Legais</label>
+                        <label class="cm-check"><input type="checkbox" data-camada="fazendas" checked /> Fazendas</label>
+                        <label class="cm-check"><input type="checkbox" data-camada="ligacoes" checked /> Pontos de ligação</label>
+                        <label class="cm-check"><input type="checkbox" data-camada="lei" checked /> O que a lei exige recompor</label>
+                    </div>
+                </div>
+                <div class="co-mapa" id="co-mapa" role="region" aria-label="Mapa dos corredores ecológicos"></div>
+                <p class="co-mapa-dica">@Html.Icone("touch_app") Clique numa mata do mapa para ver o tamanho do corredor, ou numa fazenda para ver os dados dela.</p>
+            </div>
+
+            <div class="cm-abas co-abas" role="tablist">
+                <button type="button" class="cm-aba is-ativa" role="tab" data-aba="fazendas" aria-selected="true">@Html.Icone("agriculture") Por fazenda</button>
+                <button type="button" class="cm-aba" role="tab" data-aba="ligacoes" aria-selected="false">@Html.Icone("link") Onde restaurar</button>
+                <button type="button" class="cm-aba" role="tab" data-aba="corredores" aria-selected="false">@Html.Icone("forest") Corredores</button>
+                <button type="button" class="cm-aba" role="tab" data-aba="metodo" aria-selected="false">@Html.Icone("menu_book") Como foi calculado</button>
+            </div>
+
+            <section class="co-painel" data-painel="fazendas">
+                <div class="co-painel-topo">
+                    <div class="cm-busca"><span class="material-icons">search</span><input id="co-busca" class="cm-input" placeholder="Buscar fazenda, produtor ou CAR" /></div>
+                    <button type="button" class="cm-btn cm-btn--contorno cm-btn--pequeno" id="co-csv">@Html.Icone("download") Baixar planilha (CSV)</button>
+                </div>
+                <div class="cm-card cm-tabela-wrap"><div class="cm-tabela-scroll"><table class="cm-tabela co-tabela" id="co-tab-fazendas"></table></div></div>
+            </section>
+
+            <section class="co-painel" data-painel="ligacoes" hidden>
+                <p class="co-texto">Trechos curtos sem mata que, se restaurados (plantio ou regeneração), <b>ligam dois corredores</b>. Estão em ordem de prioridade: unem mais mata com a menor distância — e sobem na lista quando o trecho <b>já é APP a recompor ou Reserva Legal sem vegetação</b> (o dono já tem obrigação de restaurar; marcados em azul no mapa).</p>
+                <div class="cm-card cm-tabela-wrap"><div class="cm-tabela-scroll"><table class="cm-tabela co-tabela" id="co-tab-ligacoes"></table></div></div>
+            </section>
+
+            <section class="co-painel" data-painel="corredores" hidden>
+                <p class="co-texto">Cada corredor é um conjunto de matas ligadas entre si. Clique numa linha para ver no mapa.</p>
+                <div class="cm-card cm-tabela-wrap"><div class="cm-tabela-scroll"><table class="cm-tabela co-tabela" id="co-tab-corredores"></table></div></div>
+            </section>
+
+            <section class="co-painel" data-painel="metodo" hidden>
+                <div class="cm-card cm-card--pad co-metodo" id="co-metodo"></div>
+            </section>
+
+            <div id="co-avisos" class="co-avisos"></div>
+        </div>
+    }
+</div>
+<partial name="_Scripts" />
+@if (Model.TemDados)
+{
+    <script src="~/_content/AgroCert.Certificacao/lib/leaflet/leaflet.js"></script>
+    <script src="~/_content/AgroCert.Certificacao/js/corredores.js" asp-append-version="true"></script>
+}

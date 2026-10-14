@@ -1,0 +1,170 @@
+<a class="cm-voltar" [routerLink]="'ambiental' | acRota"><span class="material-icons" aria-hidden="true">arrow_back</span> Monitoramento Ambiental</a>
+
+<ac-estado [carregando]="!r && !erro" [erro]="erro" (tentarDeNovo)="carregar()"></ac-estado>
+
+<ng-container *ngIf="r">
+  <div class="cm-topo">
+    <div>
+      <h1 class="cm-titulo"><span class="material-icons" aria-hidden="true">eco</span> {{ r.propriedadeNome }}</h1>
+      <p class="cm-subtitulo">CAR: {{ r.carCodigo }}</p>
+    </div>
+    <div class="cm-acoes">
+      <button type="button" class="cm-btn cm-btn--contorno" [class.is-carregando]="sincAlertas" [disabled]="sincAlertas" (click)="sincronizarAlertas()">
+        <ng-container *ngIf="!sincAlertas"><span class="material-icons" aria-hidden="true">travel_explore</span> Ver alertas</ng-container>
+        <ng-container *ngIf="sincAlertas">Consultando MapBiomas...</ng-container>
+      </button>
+      <button type="button" class="cm-btn cm-btn--contorno" title="Ficha resumida com os alertas" [class.is-carregando]="abrindoPdf" [disabled]="abrindoPdf" (click)="abrirFicha()">
+        <span class="material-icons" aria-hidden="true">description</span> Ficha (PDF)
+      </button>
+      <a class="cm-btn cm-btn--primario" [routerLink]="['ambiental', r.propriedadeId, 'conformidade'] | acRota" target="_blank" rel="noopener">
+        <span class="material-icons" aria-hidden="true">fact_check</span> Relatório de conformidade
+      </a>
+      <button type="button" class="cm-btn cm-btn--contorno" title="Excluir propriedade" [disabled]="excluindo" (click)="excluir()">
+        <span class="material-icons" aria-hidden="true">delete_outline</span> Excluir propriedade
+      </button>
+    </div>
+  </div>
+
+  <section class="cm-indicadores">
+    <div class="cm-card cm-indicador">
+      <div class="cm-indicador__topo">Área do imóvel <span class="material-icons" aria-hidden="true" style="color:#5e9a42">straighten</span></div>
+      <div class="cm-indicador__valor">{{ r.areaHa !== null ? numero(r.areaHa) : '-' }} <small style="font-size:15px">ha</small></div>
+    </div>
+    <div class="cm-card cm-indicador">
+      <div class="cm-indicador__topo">Área com alertas <span class="material-icons" aria-hidden="true" style="color:#c0392b">crop_free</span></div>
+      <div class="cm-indicador__valor">{{ numero(r.areaTotalAlertasHa) }} <small style="font-size:15px">ha</small></div>
+    </div>
+    <div class="cm-card cm-indicador">
+      <div class="cm-indicador__topo">Alertas encontrados <span class="material-icons" aria-hidden="true" style="color:#c98a1a">report_problem</span></div>
+      <div class="cm-indicador__valor">{{ r.totalAlertas }}</div>
+      <div class="cm-indicador__sub">Último: {{ data(r.ultimoAlerta) }}</div>
+    </div>
+    <div class="cm-card cm-indicador">
+      <div class="cm-indicador__topo">Situação
+        <span class="material-icons" aria-hidden="true" [style.color]="r.totalAlertas === 0 ? '#1f8a4c' : '#c0392b'">{{ r.totalAlertas === 0 ? 'verified' : 'warning' }}</span>
+      </div>
+      <div class="cm-indicador__valor" style="font-size:16px;line-height:1.35">{{ r.situacao }}</div>
+    </div>
+  </section>
+
+  <div class="cm-amb-corpo" [class.tem-alerta]="alertaAberto">
+    <div class="cm-card cm-camadas">
+      <b>Camadas</b>
+      <ul>
+        <li *ngFor="let c of camadas">
+          <label>
+            <input type="checkbox" [checked]="visivel[c.chave]" (change)="alternarCamada(c.chave, $any($event.target).checked)" />
+            <span class="cm-cor" [style.border-color]="c.cor" [style.background]="c.cor + '33'"></span>{{ c.rotulo }}
+          </label>
+        </li>
+      </ul>
+      <p *ngIf="!r.geoJson?.trim()" class="cm-ajuda">Propriedade sem geometria cadastrada.</p>
+    </div>
+    <div #mapa class="cm-mapa" id="cm-mapa" role="region" aria-label="Mapa da propriedade"></div>
+    <div class="cm-card cm-alerta-painel" id="cm-alerta-painel" [hidden]="!alertaAberto">
+      <ng-container *ngIf="alertaAberto as a">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <b id="cm-alerta-titulo">Alerta {{ a.codigoAlerta || '' }}</b>
+          <button type="button" class="cm-icone-btn" id="cm-alerta-fechar" aria-label="Fechar" (click)="fecharAlerta()">
+            <span class="material-icons" aria-hidden="true">close</span>
+          </button>
+        </div>
+        <div id="cm-alerta-corpo">
+          <dl>
+            <dt>Data de detecção</dt><dd>{{ data(a.dataDeteccao) }}</dd>
+            <dt>Área</dt><dd>{{ numero(a.areaHa) }} ha</dd>
+            <dt>Fonte</dt><dd>{{ a.fonte || '-' }}</dd>
+            <dt>Classe</dt><dd>{{ a.classeDesmatamento || '-' }}</dd>
+            <dt>Status</dt><dd>{{ rotuloStatusAlerta(a.status) }}</dd>
+          </dl>
+          <div *ngIf="a.imagemAntesUrl || a.imagemDepoisUrl" class="cm-imagens" style="grid-template-columns:1fr 1fr">
+            <figure *ngIf="a.imagemAntesUrl"><img [src]="a.imagemAntesUrl | acArquivo" alt="Antes" /><figcaption>Antes</figcaption></figure>
+            <figure *ngIf="a.imagemDepoisUrl"><img [src]="a.imagemDepoisUrl | acArquivo" alt="Depois" /><figcaption>Depois</figcaption></figure>
+          </div>
+        </div>
+      </ng-container>
+    </div>
+  </div>
+
+  <section class="cm-card cm-card--pad cm-secao" id="ndvi">
+    <div class="cm-ndvi-cab">
+      <div style="flex:1;min-width:260px">
+        <h2 class="cm-card__titulo" style="margin-bottom:4px"><span class="material-icons" aria-hidden="true">grass</span> NDVI — Índice de Vegetação (Sentinel-2)</h2>
+        <p class="cm-ajuda" style="margin:0">
+          Comparação temporal da cobertura vegetal dentro do polígono do CAR, calculada por satélite (Copernicus Data Space
+          Ecosystem, gratuito). Clique num mês no gráfico ou na galeria para ver a imagem e o mapa de calor daquele período no mapa.
+        </p>
+      </div>
+      <button type="button" class="cm-btn cm-btn--contorno" [class.is-carregando]="sincNdvi" [disabled]="sincNdvi" (click)="sincronizarNdvi()">
+        <ng-container *ngIf="!sincNdvi"><span class="material-icons" aria-hidden="true">satellite_alt</span> Consultar NDVI</ng-container>
+        <ng-container *ngIf="sincNdvi">Consultando Sentinel-2...</ng-container>
+      </button>
+    </div>
+
+    <div *ngIf="leituras.length === 0" class="cm-vazio" style="margin-top:14px">Nenhuma leitura de NDVI ainda. Clique em "Consultar NDVI" para calcular os últimos 12 meses a partir de imagens Sentinel-2.</div>
+
+    <ng-container *ngIf="leituras.length > 0">
+      <div class="cm-ndvi-resumo">
+        <div class="cm-ndvi-resumo__valor" [style.color]="classe.cor">{{ f3(atual?.ndviMedio) }}</div>
+        <div>
+          <div class="cm-ndvi-resumo__classe" [style.color]="classe.cor">{{ classe.rotulo }}</div>
+          <div class="cm-ndvi-resumo__meta">
+            Referente a {{ atual ? mesAno(atual.dataImagem) : '-' }}
+            <ng-container *ngIf="variacao !== null"> · {{ variacao >= 0 ? '▲' : '▼' }} {{ f3(abs(variacao)) }} em relação ao mês anterior</ng-container>
+            <ng-container *ngIf="nuvensAltas"> · <span style="color:#b8860b">cobertura de nuvens alta neste mês — leitura pouco confiável</span></ng-container>
+          </div>
+        </div>
+      </div>
+
+      <svg class="cm-ndvi-grafico" [attr.viewBox]="'0 0 ' + G.L + ' ' + G.A" preserveAspectRatio="none" role="img" aria-label="Série mensal de NDVI">
+        <svg:line *ngFor="let y of linhasRef" [attr.x1]="G.mEsq" [attr.x2]="G.L - G.mDir" [attr.y1]="y" [attr.y2]="y" stroke="#e5e5e5" stroke-width="1" />
+        <svg:polyline [attr.points]="linhaNdvi" fill="none" stroke="#5e9a42" stroke-width="2.5" />
+        <svg:a *ngFor="let p of pontos" class="ponto" [attr.href]="'?mes=' + p.mes + '#ndvi'" (click)="selecionarMes(p.mes, $event)">
+          <svg:circle [attr.cx]="p.x" [attr.cy]="p.y" [attr.r]="p.sel ? 6.5 : 4" [attr.fill]="p.cor"
+                      [attr.stroke]="p.sel ? '#3e6e2a' : '#fff'" [attr.stroke-width]="p.sel ? 2.5 : 1.5">
+            <svg:title>{{ p.rotulo }} — NDVI {{ f3(p.leitura.ndviMedio) }}</svg:title>
+          </svg:circle>
+          <svg:text [attr.x]="p.x" [attr.y]="G.A - 6" font-size="9.5" text-anchor="middle" [attr.fill]="p.sel ? '#3e6e2a' : '#6f6a5f'"
+                    [attr.font-weight]="p.sel ? 700 : 400">{{ p.rotulo }}</svg:text>
+        </svg:a>
+      </svg>
+      <p class="cm-ndvi-legenda">
+        NDVI varia de 0 a 1: abaixo de 0,2 indica solo exposto ou água; de 0,2 a 0,5, vegetação esparsa ou estressada; acima
+        de 0,5, cobertura vegetal moderada a densa. Uma queda brusca entre leituras pode indicar desmatamento, colheita ou
+        estresse hídrico — vale conferir em campo.
+      </p>
+
+      <b style="font-size:14px">Imagens Sentinel-2 (cor real)</b>
+      <p *ngIf="comCorReal.length === 0" class="cm-ajuda">Nenhuma imagem de satélite ainda. Clique em "Consultar NDVI" para baixar as imagens dos últimos meses.</p>
+      <div class="cm-galeria">
+        <a *ngFor="let l of comCorReal" [attr.href]="'?mes=' + mesIso(l.dataImagem) + '#ndvi'" [class.is-ativo]="atual?.id === l.id"
+           [title]="'Ver ' + mesAno(l.dataImagem) + ' no mapa'" (click)="selecionarMes(mesIso(l.dataImagem), $event)">
+          <img [src]="l.imagemCorRealUrl | acArquivo" [alt]="'Sentinel-2 — ' + mesAno(l.dataImagem)" loading="lazy" />
+          <span>{{ mesAno(l.dataImagem) }}</span>
+        </a>
+      </div>
+    </ng-container>
+  </section>
+
+  <section *ngIf="linhaDoTempo.length > 0" class="cm-card cm-card--pad cm-secao">
+    <h2 class="cm-card__titulo"><span class="material-icons" aria-hidden="true">history</span> Linha do Tempo de Imagens</h2>
+    <p class="cm-ajuda" style="margin-top:-6px">Imagens de antes/depois de cada alerta de desmatamento, organizadas por ano de detecção.</p>
+    <div *ngFor="let g of linhaDoTempo" class="cm-lt-ano">
+      <div class="cm-lt-ano__rotulo">{{ g.ano }}</div>
+      <div class="cm-lt-lista">
+        <div *ngFor="let a of g.alertas" class="cm-card cm-lt-item">
+          <div class="cm-imagens">
+            <figure *ngIf="a.imagemAntesUrl"><img [src]="a.imagemAntesUrl | acArquivo" alt="Antes" loading="lazy" /><figcaption>Antes</figcaption></figure>
+            <figure *ngIf="a.imagemDepoisUrl"><img [src]="a.imagemDepoisUrl | acArquivo" alt="Depois" loading="lazy" /><figcaption>Depois</figcaption></figure>
+          </div>
+          <div class="cm-lt-meta">
+            <span class="cm-codigo">{{ a.codigoAlerta }}</span><span>{{ data(a.dataDeteccao) }}</span>
+            <span *ngIf="a.areaHa !== null">{{ numero(a.areaHa) }} ha</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <p class="cm-aviso">{{ r.aviso }}</p>
+</ng-container>

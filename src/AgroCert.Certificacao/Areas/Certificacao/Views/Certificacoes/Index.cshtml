@@ -1,0 +1,61 @@
+@model List<Certificacao>
+@{
+    ViewData["Title"] = "Certificações Ativas";
+    ViewData["MenuAtivo"] = "cert-ativas";
+}
+<div class="cert-modulo">
+    <partial name="_Recursos" />
+
+    <div class="cm-topo">
+        <div>
+            <h1 class="cm-titulo">@Html.Icone("workspace_premium") Certificações Ativas</h1>
+            <p class="cm-subtitulo">Gestão e acompanhamento das @Model.Count certificações ativas</p>
+        </div>
+        <div class="cm-acoes">
+            <button type="button" class="cm-btn cm-btn--primario" data-abrir-modal="modal-certificacao">@Html.Icone("add") Nova Certificação</button>
+        </div>
+    </div>
+
+    @if (Model.Count == 0)
+    {
+        <div class="cm-vazio">Nenhuma certificação cadastrada ainda.</div>
+    }
+
+    <div class="cm-grade">
+        @foreach (var c in Model)
+        {
+            <article class="cm-card cm-cert">
+                <div class="cm-cert__topo">
+                    <span class="cm-avatar" style="background:@c.Cor">@c.Sigla</span>
+                    <div class="cm-cert__id">
+                        <div class="cm-cert__nome">@c.Nome</div>
+                        <div class="cm-cert__escopo" title="@c.Escopo">@c.Escopo</div>
+                    </div>
+                    @Html.Pilula(c.Status, Rotulos.EstiloStatusCertificacao(c.Status))
+                </div>
+
+                <div class="cm-conf" style="background:@HtmlExtensoes.CorSuave(c.Cor)">
+                    <div>
+                        <div class="cm-conf__pct" style="color:@c.Cor">@(c.Conformidade ?? 0)%</div>
+                        <div class="cm-conf__legenda">conformidade geral</div>
+                    </div>
+                    <div class="cm-conf__req" style="color:@c.Cor">@(c.Conformes ?? 0)/@(c.TotalRequisitos ?? 0)<span>requisitos</span></div>
+                </div>
+
+                <div class="cm-detalhes">
+                    <div><span class="cm-dl">Organismo</span><span class="cm-dv">@(string.IsNullOrWhiteSpace(c.Organismo) ? "—" : c.Organismo)</span></div>
+                    <div><span class="cm-dl">Válido até</span><span class="cm-dv">@Rotulos.Data(c.ValidoAte)</span></div>
+                    <div><span class="cm-dl">Última auditoria</span><span class="cm-dv">@Rotulos.Data(c.UltimaAuditoria)</span></div>
+                    <div><span class="cm-dl">Próxima auditoria</span><span class="cm-dv" style="color:var(--cm-verde-texto)">@Rotulos.Data(c.ProximaAuditoria)</span></div>
+                </div>
+
+                <div class="cm-rodape-card">
+                    <a href="/certificacao/certificacoes/@c.Id">Ver detalhes e categorias →</a>
+                </div>
+            </article>
+        }
+    </div>
+
+    <partial name="_FormCertificacao" model="new Certificacao()" />
+</div>
+<partial name="_Scripts" />

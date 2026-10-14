@@ -1,0 +1,97 @@
+<a class="cm-voltar" [routerLink]="'vistorias' | acRota"><span class="material-icons" aria-hidden="true">arrow_back</span> Vistorias</a>
+
+<ac-estado [carregando]="!v && !erro" [erro]="erro" (tentarDeNovo)="carregar()"></ac-estado>
+
+<ng-container *ngIf="v">
+  <div class="cm-topo">
+    <div>
+      <h1 class="cm-titulo"><span class="material-icons" aria-hidden="true">fact_check</span> {{ v.unidadePropriedade }}</h1>
+      <p class="cm-subtitulo">
+        <span class="cm-codigo">{{ v.codigoDocumento }}</span> · {{ rotuloTipoVistoria(v.tipo) }} · {{ v.dataVistoria | acData }}{{ v.setorArea?.trim() ? ' · ' + v.setorArea : '' }}
+      </p>
+    </div>
+    <div class="cm-acoes">
+      <button type="button" class="cm-btn cm-btn--contorno" [disabled]="abrindoPdf" (click)="abrirPdf()"><span class="material-icons" aria-hidden="true">picture_as_pdf</span> Relatório PDF</button>
+      <button type="button" class="cm-btn cm-btn--primario" (click)="abrirNovo()"><span class="material-icons" aria-hidden="true">add</span> Novo Apontamento</button>
+      <button type="button" class="cm-btn cm-btn--perigo" title="Excluir vistoria" aria-label="Excluir vistoria" [disabled]="excluindo" (click)="excluir()"><span class="material-icons" aria-hidden="true">delete_outline</span></button>
+    </div>
+  </div>
+
+  <section class="cm-stats">
+    <div class="cm-card cm-stat" style="--cor:#c0392b"><div class="cm-stat__valor">{{ v.criticos }}</div><div class="cm-stat__rotulo">Críticos</div></div>
+    <div class="cm-card cm-stat" style="--cor:#b8860b"><div class="cm-stat__valor">{{ v.altos }}</div><div class="cm-stat__rotulo">Altos</div></div>
+    <div class="cm-card cm-stat" style="--cor:#1f6fb2"><div class="cm-stat__valor">{{ v.medios }}</div><div class="cm-stat__rotulo">Médios</div></div>
+    <div class="cm-card cm-stat" style="--cor:#1f8a4c"><div class="cm-stat__valor">{{ v.baixos }}</div><div class="cm-stat__rotulo">Baixos</div></div>
+  </section>
+
+  <section class="cm-card cm-card--pad">
+    <h2 class="cm-card__titulo"><span class="material-icons" aria-hidden="true">report</span> Apontamentos ({{ v.totalApontamentos }})
+      <span class="cm-contador" style="margin-left:auto">{{ v.emAberto }} em aberto · {{ v.encerrados }} encerrado(s)</span>
+    </h2>
+    <div *ngIf="v.apontamentos.length === 0" class="cm-vazio">Nenhum apontamento registrado nesta vistoria. Use "Novo Apontamento" para registrar uma não conformidade.</div>
+    <div class="cm-apont-grade">
+      <article *ngFor="let a of v.apontamentos" class="cm-card cm-apont" [style.--cor]="corRisco(a.grauRisco)" tabindex="0" role="button"
+               (click)="aberto = a" (keydown.enter)="aberto = a">
+        <div class="cm-apont__topo">
+          <span class="cm-apont__titulo">{{ a.anomalia }}</span>
+          <ac-pilula [texto]="rotuloGrauRisco(a.grauRisco)" [estilo]="estiloGrauRisco(a.grauRisco)"></ac-pilula>
+        </div>
+        <div class="cm-apont__meta">
+          <span *ngIf="a.localizacao?.trim()"><span class="material-icons" aria-hidden="true" style="font-size:15px">place</span> {{ a.localizacao }}</span>
+          <span *ngIf="a.prazo"><span class="material-icons" aria-hidden="true" style="font-size:15px">event</span> Prazo: {{ a.prazo | acData }}</span>
+          <span *ngIf="a.requisitoId" class="cm-tag cm-tag--verde" [title]="a.requisitoTitulo ?? ''">{{ a.requisitoCodigo ?? 'Requisito vinculado' }}</span>
+        </div>
+        <ac-pilula [texto]="a.aberto ? 'Em aberto' : 'Encerrado'" [estilo]="estiloStatusApontamento(a.status)"></ac-pilula>
+      </article>
+    </div>
+
+    <div class="cm-assinaturas">
+      <span>Responsável: <b>{{ v.tecnicoResponsavel?.trim() ? v.tecnicoResponsavel : '—' }}</b>{{ v.cargoTecnico?.trim() ? ' · ' + v.cargoTecnico : '' }}</span>
+      <span *ngIf="v.aprovadoPor?.trim()">Aprovado por: <b>{{ v.aprovadoPor }}{{ v.cargoAprovador?.trim() ? ' (' + v.cargoAprovador + ')' : '' }}</b></span>
+      <span *ngIf="v.motivo?.trim()">Motivo: <b>{{ v.motivo }}</b></span>
+    </div>
+  </section>
+</ng-container>
+
+<ac-modal-apontamento [a]="aberto" (fechar)="aberto = null" (alterado)="aberto = null; carregar()"></ac-modal-apontamento>
+
+<ac-modal [aberto]="novoAberto" titulo="Novo Apontamento" (fechar)="novoAberto = false">
+  <form #f="ngForm" (ngSubmit)="f.valid && registrar()">
+    <div class="cm-modal__corpo">
+      <div class="cm-campo"><label for="ap-anom">Anomalia / não conformidade encontrada *</label><input id="ap-anom" class="cm-input" name="Anomalia" required [(ngModel)]="novo.anomalia" placeholder="Ex: Ausência de EPI no depósito de agrotóxicos" /></div>
+      <div class="cm-linha">
+        <div class="cm-campo"><label for="ap-local">Localização</label><input id="ap-local" class="cm-input" name="Localizacao" [(ngModel)]="novo.localizacao" placeholder="Ex: Galpão 2" /></div>
+        <div class="cm-campo"><label for="ap-req">Requisito da certificação (opcional)</label>
+          <select id="ap-req" class="cm-select" name="RequisitoId" [(ngModel)]="novo.requisitoId">
+            <option value="">Nenhum</option>
+            <option *ngFor="let r of opcoesRequisito" [value]="r.id">{{ r.texto }}</option>
+          </select>
+        </div>
+      </div>
+      <span class="cm-rotulo">Grau de risco</span>
+      <div class="cm-opcoes" style="margin-top:6px">
+        <ng-container *ngFor="let g of grausRisco">
+          <input type="radio" [id]="'grau-' + g" name="GrauRisco" [value]="g" [attr.value]="g" [(ngModel)]="novo.grauRisco" />
+          <label [for]="'grau-' + g" [style.--cor]="estiloGrauRisco(g).cor">{{ rotuloGrauRisco(g) }}</label>
+        </ng-container>
+      </div>
+      <div class="cm-linha">
+        <div class="cm-campo"><label for="ap-enc">Situação encontrada</label><textarea id="ap-enc" class="cm-textarea" name="SituacaoEncontrada" [(ngModel)]="novo.situacaoEncontrada"></textarea></div>
+        <div class="cm-campo"><label for="ap-reqd">Situação requerida</label><textarea id="ap-reqd" class="cm-textarea" name="SituacaoRequerida" [(ngModel)]="novo.situacaoRequerida"></textarea></div>
+      </div>
+      <div class="cm-campo"><label for="ap-risco">Risco associado</label><textarea id="ap-risco" class="cm-textarea" name="RiscoAssociado" [(ngModel)]="novo.riscoAssociado" placeholder="Ex: Risco de contaminação e não conformidade com a norma X"></textarea></div>
+      <div class="cm-linha">
+        <div class="cm-campo"><label for="ap-prazo">Prazo para regularização</label><input id="ap-prazo" type="date" class="cm-input" name="Prazo" [(ngModel)]="novo.prazo" /></div>
+        <div class="cm-campo"><label for="ap-resp">Responsável pela execução</label><input id="ap-resp" class="cm-input" name="ResponsavelExecucao" [(ngModel)]="novo.responsavelExecucao" /></div>
+      </div>
+      <div class="cm-linha">
+        <div class="cm-campo"><label for="ap-f1">Foto — situação encontrada</label><input #foto1 id="ap-f1" type="file" accept="image/*" class="cm-input" name="ImagemEncontrada" /></div>
+        <div class="cm-campo"><label for="ap-f2">Foto — situação requerida (referência)</label><input #foto2 id="ap-f2" type="file" accept="image/*" class="cm-input" name="ImagemRequerida" /></div>
+      </div>
+    </div>
+    <div class="cm-modal__acoes">
+      <button type="button" class="cm-btn cm-btn--contorno" (click)="novoAberto = false">Cancelar</button>
+      <button type="submit" class="cm-btn cm-btn--primario" [class.is-carregando]="salvando" [disabled]="salvando">{{ salvando ? 'Salvando...' : 'Registrar Apontamento' }}</button>
+    </div>
+  </form>
+</ac-modal>

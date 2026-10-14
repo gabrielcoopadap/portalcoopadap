@@ -1,0 +1,69 @@
+<div class="cm-topo">
+  <div>
+    <h1 class="cm-titulo"><span class="material-icons" aria-hidden="true">eco</span> Monitoramento Ambiental</h1>
+    <p class="cm-subtitulo">Desmatamento e vegetação por propriedade, a partir do código do CAR</p>
+  </div>
+  <div class="cm-acoes">
+    <button type="button" class="cm-btn cm-btn--primario" (click)="abrirModal()">
+      <span class="material-icons" aria-hidden="true">add</span> Nova Propriedade
+    </button>
+  </div>
+</div>
+
+<ac-estado [carregando]="!propriedades && !erro" [erro]="erro" (tentarDeNovo)="carregar()"></ac-estado>
+
+<ng-container *ngIf="propriedades">
+  <div *ngIf="propriedades.length === 0" class="cm-vazio">Nenhuma propriedade cadastrada ainda. Cadastre uma pelo código do CAR.</div>
+
+  <div class="cm-grade">
+    <article *ngFor="let p of propriedades; trackBy: porId" class="cm-card cm-cert">
+      <div class="cm-cert__topo">
+        <span class="cm-avatar" style="background:#5e9a42"><span class="material-icons" aria-hidden="true">agriculture</span></span>
+        <div class="cm-cert__id">
+          <div class="cm-cert__nome">{{ p.nome }}</div>
+          <div class="cm-cert__escopo" [title]="p.carCodigo">CAR: {{ p.carCodigo }}</div>
+        </div>
+        <button type="button" class="cm-icone-btn" title="Excluir" [disabled]="excluindo === p.id" (click)="excluir(p)">
+          <span class="material-icons" aria-hidden="true">delete_outline</span>
+        </button>
+      </div>
+      <div class="cm-detalhes">
+        <div><span class="cm-dl">Área do imóvel</span><span class="cm-dv">{{ p.areaHa !== null ? numero(p.areaHa) + ' ha' : 'não disponível' }}</span></div>
+        <div><span class="cm-dl">Município</span><span class="cm-dv">{{ p.municipio === null ? '—' : p.municipio + '/' + p.uf }}</span></div>
+      </div>
+      <div class="cm-rodape-card"><a [routerLink]="['ambiental', p.id] | acRota">Ver mapa, alertas e NDVI →</a></div>
+    </article>
+  </div>
+</ng-container>
+
+<ac-modal [aberto]="modalAberto" titulo="Nova Propriedade (CAR)" (fechar)="modalAberto = false">
+  <form (ngSubmit)="cadastrar()" ngNativeValidate>
+    <div class="cm-modal__corpo">
+      <div class="cm-campo">
+        <label for="p-nome">Nome da propriedade *</label>
+        <input id="p-nome" class="cm-input" name="Nome" required placeholder="Ex: Fazenda São João" [(ngModel)]="nome" />
+      </div>
+      <div class="cm-campo">
+        <label for="p-car">Código do CAR *</label>
+        <input id="p-car" class="cm-input" name="CarCodigo" required placeholder="MG-XXXXXXX-XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX" [(ngModel)]="carCodigo" />
+      </div>
+      <label class="cm-check">
+        <input type="checkbox" name="geometriaManual" [(ngModel)]="geometriaManual" />
+        Ainda não tenho acesso à API do SICAR — vou colar a geometria manualmente
+      </label>
+      <p class="cm-ajuda" id="bloco-sicar" [hidden]="geometriaManual">A geometria do imóvel é buscada automaticamente no SICAR a partir do código do CAR.</p>
+      <div class="cm-campo" id="bloco-geo" [hidden]="!geometriaManual">
+        <label for="p-geo">Geometria (GeoJSON — Polygon, MultiPolygon, Feature ou FeatureCollection)</label>
+        <textarea id="p-geo" class="cm-textarea cm-textarea--geo" name="GeoJson" [(ngModel)]="geoJson"
+                  placeholder='{"type":"Polygon","coordinates":[[[...]]]}'></textarea>
+        <p class="cm-ajuda">Dá pra exportar a geometria pela Consulta Pública do SICAR (shapefile convertido em GeoJSON) e colar aqui — todas as feições são unidas num único polígono.</p>
+      </div>
+    </div>
+    <div class="cm-modal__acoes">
+      <button type="button" class="cm-btn cm-btn--contorno" (click)="modalAberto = false">Cancelar</button>
+      <button type="submit" class="cm-btn cm-btn--primario" [class.is-carregando]="salvando" [disabled]="salvando">
+        {{ salvando ? 'Consultando...' : 'Cadastrar' }}
+      </button>
+    </div>
+  </form>
+</ac-modal>

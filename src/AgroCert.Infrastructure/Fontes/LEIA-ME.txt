@@ -1,0 +1,7 @@
+Fontes usadas nos relatórios PDF (vistoria e ambiental).
+
+Liberation Sans — licença SIL Open Font License 1.1 (livre para uso e redistribuição).
+É métrica-compatível com a Arial, então os PDFs ficam iguais em Windows e Linux (AWS).
+
+Para usar outra fonte (ex.: a Redonda do portal), coloque os arquivos .ttf/.otf aqui e
+ajuste "AgroCert:Relatorios:Fonte" no appsettings.json.

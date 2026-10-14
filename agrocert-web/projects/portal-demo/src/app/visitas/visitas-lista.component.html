@@ -1,0 +1,100 @@
+<div class="pt-tela">
+  <div class="pt-tela__topo">
+    <h1 class="pt-tela__titulo"><span class="material-icons">assignment_ind</span> Visitas Técnicas</h1>
+    <a class="pt-btn pt-btn--verde" routerLink="/portal/visita-tecnica/nova"><span class="material-icons">add</span> Nova Visita</a>
+  </div>
+
+  <section class="pt-card pt-filtros">
+    <div class="pt-filtros__cab">
+      <span>Filtros</span>
+      <button type="button" class="pt-link" (click)="mostrarFiltros = !mostrarFiltros">
+        <span class="material-icons">{{ mostrarFiltros ? 'expand_less' : 'expand_more' }}</span>
+        {{ mostrarFiltros ? 'Esconder filtros' : 'Mostrar filtros' }}
+      </button>
+    </div>
+
+    <form *ngIf="mostrarFiltros" (ngSubmit)="buscar()">
+      <div class="pt-grade pt-grade--3">
+        <label class="pt-campo">Tipo de Visita:
+          <select class="pt-input" name="tipo" [(ngModel)]="f.tipo"><option value="">Selecione</option><option *ngFor="let t of tipos">{{ t }}</option></select>
+        </label>
+      </div>
+      <div class="pt-grade pt-grade--3">
+        <label class="pt-campo">Cultura:
+          <select class="pt-input" name="cultura" [(ngModel)]="f.cultura"><option value="">Selecione</option><option *ngFor="let c of culturas">{{ c }}</option></select>
+        </label>
+        <label class="pt-campo">Cooperado:
+          <select class="pt-input" name="cooperado" [(ngModel)]="f.cooperado" (ngModelChange)="f.propriedade = ''"><option value="">Selecione</option><option *ngFor="let c of cooperados">{{ c.nome }}</option></select>
+        </label>
+        <label class="pt-campo">Propriedade:
+          <select class="pt-input" name="propriedade" [(ngModel)]="f.propriedade"><option value="">Selecione</option><option *ngFor="let p of propriedades(f.cooperado)">{{ p }}</option></select>
+        </label>
+      </div>
+      <div class="pt-grade pt-grade--2">
+        <label class="pt-campo">Data da Visita :
+          <input class="pt-input" type="date" name="data" [(ngModel)]="f.data" />
+        </label>
+        <label class="pt-campo">Técnico Responsável:
+          <select class="pt-input" name="tecnico" [(ngModel)]="f.tecnico"><option value="">Selecione</option><option *ngFor="let t of tecnicos">{{ t }}</option></select>
+        </label>
+        <label class="pt-campo">Descrição:
+          <input class="pt-input" name="descricao" placeholder="Digite" [(ngModel)]="f.descricao" />
+        </label>
+        <label class="pt-campo">Nº Visita:
+          <input class="pt-input" name="numero" inputmode="numeric" [(ngModel)]="f.numero" />
+        </label>
+      </div>
+      <div class="pt-grade pt-grade--4">
+        <label class="pt-campo">Criada por:
+          <select class="pt-input" name="criadoPor" [(ngModel)]="f.criadoPor"><option value="">Selecione</option><option *ngFor="let u of usuarios">{{ u }}</option></select>
+        </label>
+        <label class="pt-campo">Data de criação :
+          <input class="pt-input" type="date" name="criadoEm" [(ngModel)]="f.criadoEm" />
+        </label>
+        <label class="pt-campo">Alterada por:
+          <select class="pt-input" name="alteradoPor" [(ngModel)]="f.alteradoPor"><option value="">Selecione</option><option *ngFor="let u of usuarios">{{ u }}</option></select>
+        </label>
+        <label class="pt-campo">Data de alteração :
+          <input class="pt-input" type="date" name="alteradoEm" [(ngModel)]="f.alteradoEm" />
+        </label>
+      </div>
+      <div class="pt-acoes-centro">
+        <button type="button" class="pt-btn pt-btn--cinza" [disabled]="!temFiltro()" (click)="limpar()"><span class="material-icons">close</span> Limpar</button>
+        <button type="submit" class="pt-btn pt-btn--verde"><span class="material-icons">search</span> Buscar</button>
+      </div>
+    </form>
+  </section>
+
+  <section class="pt-card pt-tabela-card">
+    <div class="pt-tabela-rolagem">
+      <table class="pt-tabela">
+        <thead>
+          <tr>
+            <th>Nº Visita</th><th>Tipo de Visita</th><th>Cultura</th><th>Cooperado</th><th>Propriedade</th><th>Data da Visita</th>
+            <th>Descrição</th><th>Técnico Responsável</th><th>Criado por</th><th>Data de criação</th><th>Alterado por</th><th>Data de alteração</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let v of pagina()" class="pt-clicavel" tabindex="0" (click)="abrir(v)" (keydown.enter)="abrir(v)">
+            <td>{{ v.numero }}</td><td>{{ v.tipo || '-' }}</td><td>{{ v.cultura }}</td><td>{{ v.cooperado }}</td><td>{{ v.propriedade }}</td>
+            <td class="pt-centro">{{ dataBr(v.data) }}</td><td>{{ v.descricao }}</td><td>{{ v.tecnico }}</td><td>{{ v.criadoPor }}</td>
+            <td class="pt-centro">{{ dataHoraBr(v.criadoEm) }}</td><td class="pt-centro">{{ v.alteradoPor || '-' }}</td><td class="pt-centro">{{ dataHoraBr(v.alteradoEm) }}</td>
+          </tr>
+          <tr *ngIf="!filtradas.length"><td colspan="12" class="pt-vazio">Não há dados para exibir no momento.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="pt-paginacao">
+      <span>Itens por página</span>
+      <select class="pt-input pt-input--curto" [(ngModel)]="porPagina" (ngModelChange)="paginaAtual = 0">
+        <option [ngValue]="10">10</option><option [ngValue]="25">25</option><option [ngValue]="50">50</option>
+      </select>
+      <span class="pt-paginacao__info">{{ filtradas.length ? 'Página: ' + (paginaAtual + 1) + ' de ' + totalPaginas() : 'Sem resultados' }}</span>
+      <button type="button" class="pt-icone" aria-label="Primeira página" [disabled]="paginaAtual === 0" (click)="paginaAtual = 0"><span class="material-icons">first_page</span></button>
+      <button type="button" class="pt-icone" aria-label="Página anterior" [disabled]="paginaAtual === 0" (click)="paginaAtual = paginaAtual - 1"><span class="material-icons">chevron_left</span></button>
+      <button type="button" class="pt-icone" aria-label="Próxima página" [disabled]="paginaAtual >= totalPaginas() - 1" (click)="paginaAtual = paginaAtual + 1"><span class="material-icons">chevron_right</span></button>
+      <button type="button" class="pt-icone" aria-label="Última página" [disabled]="paginaAtual >= totalPaginas() - 1" (click)="paginaAtual = totalPaginas() - 1"><span class="material-icons">last_page</span></button>
+    </div>
+  </section>
+  <p class="pt-nota">Dados de exemplo (ambiente de teste). No portal, as visitas vêm do sistema da cooperativa.</p>
+</div>

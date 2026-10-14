@@ -1,0 +1,130 @@
+@model RegistrosViewModel
+@{
+    ViewData["Title"] = "Registros de fauna e flora";
+    ViewData["MenuAtivo"] = "cert-fauna-flora";
+    var voltar = Context.Request.Path + Context.Request.QueryString;
+    var especieFiltro = Model.EspecieId is long eid ? Model.Modal.Especies.FirstOrDefault(e => e.Id == eid) : null;
+    var filtros = !string.IsNullOrEmpty(Model.Reino) || !string.IsNullOrEmpty(Model.Origem) || Model.EspecieId.HasValue || Model.Dias > 0;
+}
+<div class="cert-modulo">
+    <partial name="_Recursos" />
+    <a class="cm-voltar" href="/certificacao/fauna-flora">@Html.Icone("arrow_back") Fauna e Flora</a>
+
+    <div class="cm-topo">
+        <div>
+            <h1 class="cm-titulo">@Html.Icone("list_alt") Registros de ocorrência</h1>
+            <p class="cm-subtitulo">@Model.Registros.Count de @Model.Total registro(s)@(especieFiltro is null ? "" : $" — {especieFiltro.NomePopular}")</p>
+        </div>
+        <div class="cm-acoes">
+            <a class="cm-btn cm-btn--contorno" href="/certificacao/fauna-flora/especies">@Html.Icone("menu_book") Catálogo de espécies</a>
+            <button type="button" class="cm-btn cm-btn--primario" data-abrir-modal="modal-registro">@Html.Icone("add_a_photo") Novo registro</button>
+        </div>
+    </div>
+
+    <form class="cm-card cm-filtros" method="get" action="/certificacao/fauna-flora/registros">
+        <div class="cm-filtros__topo">
+            <span class="cm-filtros__rotulo">Filtros</span>
+            <button type="button" class="cm-filtros__alternar" data-alternar-filtros>@Html.Icone("expand_less")<span class="rot">Esconder filtros</span></button>
+        </div>
+        <div class="cm-filtros__corpo">
+            <div class="cm-campo">
+                <label for="fr-esp">Espécie</label>
+                <select id="fr-esp" class="cm-select" name="especieId">
+                    <option value="">Todas</option>
+                    @foreach (var e in Model.Modal.Especies) { <option value="@e.Id" selected="@(e.Id == Model.EspecieId)">@e.NomePopular</option> }
+                </select>
+            </div>
+            <div class="cm-campo">
+                <label for="fr-reino">Fauna / Flora</label>
+                <select id="fr-reino" class="cm-select" name="reino">
+                    <option value="">Todas</option>
+                    <option value="FAUNA" selected="@(Model.Reino == "FAUNA")">Fauna</option>
+                    <option value="FLORA" selected="@(Model.Reino == "FLORA")">Flora</option>
+                </select>
+            </div>
+            <div class="cm-campo">
+                <label for="fr-orig">Origem</label>
+                <select id="fr-orig" class="cm-select" name="origem">
+                    <option value="">Todas</option>
+                    @foreach (var o in Enum.GetValues<OrigemRegistro>()) { <option value="@o" selected="@(Model.Origem == o.ToString())">@Biodiversidade.RotuloOrigem(o)</option> }
+                </select>
+            </div>
+            <div class="cm-campo">
+                <label for="fr-dias">Período</label>
+                <select id="fr-dias" class="cm-select" name="dias">
+                    <option value="0">Todo o histórico</option>
+                    <option value="30" selected="@(Model.Dias == 30)">Últimos 30 dias</option>
+                    <option value="90" selected="@(Model.Dias == 90)">Últimos 90 dias</option>
+                    <option value="365" selected="@(Model.Dias == 365)">Últimos 12 meses</option>
+                </select>
+            </div>
+            <div class="cm-filtros__botoes">
+                @if (filtros) { <a class="cm-btn cm-btn--contorno" href="/certificacao/fauna-flora/registros">Limpar</a> }
+                <button type="submit" class="cm-btn cm-btn--primario">@Html.Icone("filter_alt") Filtrar</button>
+            </div>
+        </div>
+    </form>
+
+    <div class="cm-card cm-tabela-wrap">
+        <div class="cm-tabela-scroll">
+            <table class="cm-tabela">
+                <thead><tr><th style="width:56px"></th><th>Espécie</th><th>Data</th><th>Origem</th><th>Área</th><th>Localização</th><th>Registrado por</th><th style="width:48px"></th></tr></thead>
+                <tbody>
+                    @if (Model.Registros.Count == 0)
+                    {
+                        <tr><td colspan="8" class="cm-tabela__vazio">Nenhum registro encontrado.</td></tr>
+                    }
+                    @foreach (var r in Model.Registros.Take(500))
+                    {
+                        var g = Biodiversidade.Grupo(r.Especie.Reino, r.Especie.Grupo);
+                        var foto = r.FotoUrl ?? r.Especie.FotoUrl;
+                        <tr>
+                            <td>
+                                @if (r.FotoUrl != null)
+                                {
+                                    <a href="@r.FotoUrl" target="_blank">@Html.Foto(foto, g, "ff-thumb", r.Especie.NomePopular)</a>
+                                }
+                                else
+                                {
+                                    @Html.Foto(foto, g, "ff-thumb", r.Especie.NomePopular)
+                                }
+                            </td>
+                            <td>
+                                <div class="cm-t-titulo">@r.Especie.NomePopular</div>
+                                <div class="cm-t-sub"><i>@r.Especie.NomeCientifico</i> · @g.Nome@(r.Quantidade > 1 ? $" · {r.Quantidade} indivíduos" : "")</div>
+                                @if (!string.IsNullOrWhiteSpace(r.Observacao)) { <div class="cm-t-sub">@r.Observacao</div> }
+                            </td>
+                            <td style="white-space:nowrap">@r.DataHora.ToString("dd/MM/yyyy")<div class="cm-t-sub">@r.DataHora.ToString("HH:mm")</div></td>
+                            <td>@Biodiversidade.RotuloOrigem(r.Origem)@if (r.Camera != null) { <div class="cm-t-sub">@r.Camera</div> }</td>
+                            <td>@(r.Area ?? "—")@if (r.Propriedade != null) { <div class="cm-t-sub">@r.Propriedade.Nome</div> }</td>
+                            <td style="white-space:nowrap">
+                                @if (r.Latitude.HasValue && r.Longitude.HasValue)
+                                {
+                                    var lat = r.Latitude.Value.ToString("0.00000", System.Globalization.CultureInfo.InvariantCulture);
+                                    var lon = r.Longitude.Value.ToString("0.00000", System.Globalization.CultureInfo.InvariantCulture);
+                                    <a href="https://www.google.com/maps?q=@lat,@lon" target="_blank" rel="noopener">@lat, @lon</a>
+                                }
+                                else { <span>—</span> }
+                            </td>
+                            <td>@(r.RegistradoPor ?? "—")</td>
+                            <td>
+                                <form method="post" action="/certificacao/fauna-flora/registros/@r.Id/excluir" data-confirmar="Excluir este registro?">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="voltarPara" value="@voltar" />
+                                    <button type="submit" class="cm-icone-btn" title="Excluir">@Html.Icone("delete_outline")</button>
+                                </form>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+    @if (Model.Registros.Count > 500)
+    {
+        <p class="cm-ajuda">Mostrando os 500 mais recentes — use os filtros para ver os demais.</p>
+    }
+
+    <partial name="_ModalRegistro" model="Model.Modal" />
+</div>
+<partial name="_Scripts" />

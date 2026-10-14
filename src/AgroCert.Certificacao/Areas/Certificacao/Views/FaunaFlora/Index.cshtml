@@ -1,0 +1,380 @@
+@model PainelFaunaFloraDto
+@using System.Globalization
+@using System.Text.Json
+@{
+    ViewData["Title"] = "Fauna e Flora";
+    ViewData["MenuAtivo"] = "cert-fauna-flora";
+    var inv = CultureInfo.InvariantCulture;
+    var meses = (int)(ViewData["Meses"] ?? 6);
+    string F(double v) => v.ToString("0.#", inv);
+    GrupoBio G(Especie e) => Biodiversidade.Grupo(e.Reino, e.Grupo);
+    string DataHora(DateTime d) => d.ToString("dd/MM/yyyy HH:mm");
+
+    var dadosMapa = JsonSerializer.Serialize(new
+    {
+        areas = Model.Propriedades.Select(p => new { nome = p.Nome, car = p.GeoJson, rl = p.GeoJsonReservaLegal, app = p.GeoJsonApp }),
+        pontos = Model.RegistrosMapa.OrderByDescending(r => r.DataHora).Select(r =>
+        {
+            var g = G(r.Especie);
+            return new
+            {
+                especieId = r.EspecieId, lat = r.Latitude, lon = r.Longitude, reino = r.Especie.Reino.ToString(), grupo = g.Nome, cor = g.Cor, icone = g.Icone,
+                nome = r.Especie.NomePopular, cientifico = r.Especie.NomeCientifico, data = r.DataHora.ToString("dd/MM/yyyy"),
+                ts = new DateTimeOffset(r.DataHora).ToUnixTimeMilliseconds(), area = r.Area,
+                origem = Biodiversidade.RotuloOrigem(r.Origem), foto = r.FotoUrl ?? r.Especie.FotoUrl,
+            };
+        }),
+    });
+
+    const double LW = 360, LH = 178, mEsq = 28, mDir = 26, mTopo = 12, mBase = 22;
+    var evo = Model.Evolucao;
+    var maxBruto = evo.Count == 0 ? 0 : evo.Max(p => Math.Max(p.Fauna, p.Flora));
+    var passos = new[] { 5, 10, 20, 25, 50, 100, 200, 250, 500, 1000 };
+    var passo = passos.FirstOrDefault(s => s * 4 >= maxBruto, 1000);
+    var maxY = Math.Max(passo * 4, 4);
+    double LX(int i) => evo.Count <= 1 ? (mEsq + LW - mDir) / 2 : mEsq + (LW - mEsq - mDir) * i / (evo.Count - 1);
+    double LY(int v) => mTopo + (LH - mTopo - mBase) * (1 - (double)v / maxY);
+    string Linha(Func<PontoMes, int> sel) => string.Join(" ", evo.Select((p, i) => $"{F(LX(i))},{F(LY(sel(p)))}"));
+    var areaFauna = evo.Count == 0 ? "" : $"{F(LX(0))},{F(LY(0))} {Linha(p => p.Fauna)} {F(LX(evo.Count - 1))},{F(LY(0))}";
+
+    const double R = 52, C = 2 * Math.PI * R;
+    var totalFatias = Model.DistribuicaoFauna.Sum(f => f.Quantidade);
+}
+<div class="cert-modulo">
+    <partial name="_Recursos" />
+
+    <section class="ff-hero">
+        <div class="ff-hero__id">
+            <span class="ff-hero__icone">@Html.Icone("forest")</span>
+            <div>
+                <h1>Fauna e Flora</h1>
+                <p>Biodiversidade que protege o hoje e garante o amanhã.</p>
+            </div>
+        </div>
+        <div class="cm-acoes">
+            <a class="cm-btn cm-btn--contorno" href="/certificacao/fauna-flora/especies">@Html.Icone("menu_book") Catálogo de espécies</a>
+            <a class="cm-btn cm-btn--contorno" href="/certificacao/fauna-flora/registros">@Html.Icone("list_alt") Registros</a>
+            <button type="button" class="cm-btn ff-btn-claro" data-abrir-modal="modal-registro">@Html.Icone("add_a_photo") Novo registro</button>
+        </div>
+    </section>
+
+    <section class="ff-kpis">
+        @foreach (var k in Model.Indicadores)
+        {
+            <div class="cm-card ff-kpi">
+                <span class="ff-kpi__icone">@Html.Icone(k.Icone)</span>
+                <div style="min-width:0">
+                    <div class="ff-kpi__rotulo">@k.Rotulo</div>
+                    <div class="ff-kpi__valor">@k.Valor</div>
+                    <div class="ff-kpi__var">
+                        @if (k.Variacao.HasValue)
+                        {
+                            var sobe = k.Variacao >= 0;
+                            <b class="@(sobe ? "" : "is-queda")">@Html.Icone(sobe ? "arrow_upward" : "arrow_downward") @Math.Abs(k.Variacao.Value)%</b>
+                            <span>&nbsp;@k.Comparacao</span>
+                        }
+                        else
+                        {
+                            <span>@(k.Nota ?? "sem base de comparação")</span>
+                        }
+                    </div>
+                </div>
+            </div>
+        }
+    </section>
+
+    <div class="ff-grade-topo">
+        <section class="cm-card ff-mapa-card">
+            <div class="ff-card__cab">
+                <div>
+                    <h2>@Html.Icone("map") Mapa de Biodiversidade</h2>
+                    <p class="ff-sub" style="margin:2px 0 0 28px">Áreas de avistamento e registros de fauna e flora. Clique no mapa para registrar uma ocorrência.</p>
+                </div>
+            </div>
+            <div class="ff-mapa-corpo" style="margin-top:12px">
+                <div class="ff-filtros-mapa">
+                    <div class="ff-abas" role="group" aria-label="Reino">
+                        <button type="button" class="is-ativa" data-reino-mapa="FAUNA" aria-pressed="true">@Html.Icone("pets") Fauna</button>
+                        <button type="button" data-reino-mapa="FLORA" aria-pressed="false">@Html.Icone("eco") Flora</button>
+                    </div>
+                    <label class="ff-switch"><input type="checkbox" checked data-todos-mapa /><span class="ff-trilho"></span><b style="font-family:var(--cm-fonte-media)">Todos</b></label>
+                    @foreach (var reino in new[] { Reino.FAUNA, Reino.FLORA })
+                    {
+                        foreach (var g in Biodiversidade.Grupos(reino))
+                        {
+                            <label class="ff-switch" hidden="@(reino == Reino.FLORA)">
+                                <input type="checkbox" checked data-grupo-mapa="@reino|@g.Nome" />
+                                <span class="ff-trilho"></span>
+                                <span class="ff-ponto" style="background:@g.Cor"></span>@g.Plural
+                                <span class="ff-cont">0</span>
+                            </label>
+                        }
+                    }
+                    <div class="ff-tit-filtro">Mostrar</div>
+                    <select class="cm-select ff-select-mini" data-modo-mapa aria-label="O que mostrar no mapa" style="width:100%;margin-bottom:6px">
+                        <option value="ultimo" selected>Último registro de cada espécie</option>
+                        <option value="todos">Todos os registros</option>
+                    </select>
+                    <div class="ff-tit-filtro">Período</div>
+                    <select class="cm-select ff-select-mini" data-periodo-mapa aria-label="Período dos registros no mapa" style="width:100%">
+                        <option value="30">Últimos 30 dias</option>
+                        <option value="90" selected>Últimos 90 dias</option>
+                        <option value="365">Últimos 12 meses</option>
+                        <option value="0">Todo o histórico</option>
+                    </select>
+                    <div class="ff-tit-filtro">Áreas</div>
+                    <label class="cm-check" style="margin:4px 0"><input type="checkbox" checked data-area-mapa="car" /> Limite do CAR</label>
+                    <label class="cm-check" style="margin:4px 0"><input type="checkbox" checked data-area-mapa="rl" /> Reserva Legal</label>
+                    <label class="cm-check" style="margin:4px 0"><input type="checkbox" checked data-area-mapa="app" /> APP (nascentes/margens)</label>
+                    @if (Model.Propriedades.Count == 0)
+                    {
+                        <p class="ff-legenda-mapa">Cadastre a propriedade em <a href="/certificacao/ambiental">Ambiental</a> para ver as áreas.</p>
+                    }
+                </div>
+                <div class="ff-mapa" id="ff-mapa" role="region" aria-label="Mapa de biodiversidade"></div>
+            </div>
+        </section>
+
+        <div class="ff-coluna">
+            <section class="cm-card ff-card">
+                <div class="ff-card__cab">
+                    <h2>@Html.Icone("pets") Destaques de hoje</h2>
+                    <a href="/certificacao/fauna-flora/registros">Ver todos →</a>
+                </div>
+                @if (Model.DestaquesHoje.Count == 0)
+                {
+                    <p class="cm-ajuda">Nenhum registro ainda. Use "Novo registro".</p>
+                }
+                <div class="ff-destaques">
+                    @foreach (var r in Model.DestaquesHoje)
+                    {
+                        var g = G(r.Especie);
+                        <article class="ff-destaque">
+                            @Html.Foto(r.FotoUrl ?? r.Especie.FotoUrl, g, alt: r.Especie.NomePopular)
+                            <div class="ff-destaque__corpo">
+                                @Html.Pilula(g.Nome, new Estilo(HtmlExtensoes.CorSuave(g.Cor, "22"), "rgba(0,0,0,.75)"))
+                                <div class="ff-destaque__nome" title="@r.Especie.NomePopular">@r.Especie.NomePopular</div>
+                                <div class="ff-destaque__meta">@Biodiversidade.ResumoOrigem(r.Origem, r.Especie.Reino)<br />@DataHora(r.DataHora)</div>
+                            </div>
+                        </article>
+                    }
+                </div>
+            </section>
+
+            <section class="cm-card ff-card">
+                <div class="ff-card__cab">
+                    <h2>@Html.Icone("videocam") Câmeras de Monitoramento</h2>
+                    <a href="/certificacao/fauna-flora/registros?origem=CAMERA">Ver todas →</a>
+                </div>
+                @if (Model.Cameras.Count == 0)
+                {
+                    <p class="cm-ajuda">Nenhum registro de câmera ainda.</p>
+                }
+                else
+                {
+                    <div class="ff-carrossel" data-carrossel aria-roledescription="carrossel" aria-label="Últimos registros das câmeras">
+                        @foreach (var r in Model.Cameras)
+                        {
+                            var g = G(r.Especie);
+                            <div class="ff-slide" role="group" aria-roledescription="slide">
+                                @if ((r.FotoUrl ?? r.Especie.FotoUrl) is string foto)
+                                {
+                                    <div class="ff-foto"><img src="@foto" alt="@r.Especie.NomePopular" loading="lazy" /></div>
+                                }
+                                else
+                                {
+                                    <div class="ff-foto">@Html.Icone(g.Icone)</div>
+                                }
+                                <div class="ff-slide__topo"><span>@(r.Camera ?? "Câmera")</span><span>@DataHora(r.DataHora)</span></div>
+                                <div class="ff-slide__base">
+                                    <b>@r.Especie.NomePopular @(r.Especie.NomeCientifico is null ? "" : $"({r.Especie.NomeCientifico})")</b>
+                                    <span class="ff-confirmado">@(r.Confirmado ? "Registro confirmado" : "Aguardando confirmação")</span>
+                                </div>
+                            </div>
+                        }
+                        @if (Model.Cameras.Count > 1)
+                        {
+                            <button type="button" class="ff-seta ff-seta--esq" data-anterior aria-label="Anterior">@Html.Icone("chevron_left")</button>
+                            <button type="button" class="ff-seta ff-seta--dir" data-proximo aria-label="Próximo">@Html.Icone("chevron_right")</button>
+                            <span class="ff-contador-slide" data-contador></span>
+                        }
+                    </div>
+                }
+            </section>
+        </div>
+    </div>
+
+    <div class="ff-grade-base">
+        <section class="cm-card ff-card" data-abas-escopo>
+            <div class="ff-card__cab">
+                <h2>Espécies em destaque</h2>
+                <a href="/certificacao/fauna-flora/especies">Mais vistas →</a>
+            </div>
+            <div class="ff-mini-abas" data-abas role="tablist">
+                <button type="button" class="is-ativa" data-aba="fauna" role="tab" aria-selected="true">Fauna</button>
+                <button type="button" data-aba="flora" role="tab" aria-selected="false">Flora</button>
+            </div>
+            @foreach (var (chave, lista) in new[] { ("fauna", Model.DestaquesFauna), ("flora", Model.DestaquesFlora) })
+            {
+                <div data-painel="@chave" hidden="@(chave == "flora")">
+                    @if (lista.Count == 0)
+                    {
+                        <p class="cm-ajuda">Sem registros nos últimos 90 dias.</p>
+                    }
+                    <div class="ff-especies-grade">
+                        @foreach (var d in lista)
+                        {
+                            <a class="ff-especie-mini" href="/certificacao/fauna-flora/registros?especieId=@d.Especie.Id" style="color:inherit;text-decoration:none">
+                                @Html.Foto(d.FotoUrl, G(d.Especie), alt: d.Especie.NomePopular)
+                                <b>@d.Especie.NomePopular</b>
+                                <span>@d.Registros registros</span>
+                                @if (d.Variacao.HasValue)
+                                {
+                                    <span class="@(d.Variacao >= 0 ? "ff-sobe" : "ff-desce")">@(d.Variacao >= 0 ? "↑" : "↓") @Math.Abs(d.Variacao.Value)%</span>
+                                }
+                            </a>
+                        }
+                    </div>
+                </div>
+            }
+            <p class="ff-legenda-mapa">Últimos 90 dias, comparado aos 90 dias anteriores.</p>
+        </section>
+
+        <section class="cm-card ff-card">
+            <div class="ff-card__cab">
+                <h2>Evolução dos registros</h2>
+                <form method="get" action="/certificacao/fauna-flora">
+                    <select class="cm-select ff-select-mini" name="meses" onchange="this.form.submit()" aria-label="Período do gráfico">
+                        <option value="6" selected="@(meses == 6)">Últimos 6 meses</option>
+                        <option value="12" selected="@(meses == 12)">Últimos 12 meses</option>
+                    </select>
+                </form>
+            </div>
+            <div class="ff-legenda">
+                <span><i style="background:@Biodiversidade.CorFauna"></i>Fauna</span>
+                <span><i style="background:@Biodiversidade.CorFlora"></i>Flora</span>
+            </div>
+            <svg class="ff-grafico" viewBox="0 0 @F(LW) @F(LH)" role="img" aria-label="Registros por mês de fauna e flora">
+                @for (var t = 0; t <= 4; t++)
+                {
+                    var v = maxY * t / 4;
+                    <line x1="@F(mEsq)" x2="@F(LW - mDir)" y1="@F(LY(v))" y2="@F(LY(v))" stroke="#ececec" stroke-width="1" />
+                    @:<text x="@F(mEsq - 6)" y="@F(LY(v) + 3)" text-anchor="end">@v</text>
+                }
+                <polygon points="@areaFauna" fill="@Biodiversidade.CorFauna" fill-opacity=".10" />
+                <polyline points="@Linha(p => p.Flora)" fill="none" stroke="@Biodiversidade.CorFlora" stroke-width="2" stroke-linejoin="round" />
+                <polyline points="@Linha(p => p.Fauna)" fill="none" stroke="@Biodiversidade.CorFauna" stroke-width="2" stroke-linejoin="round" />
+                @for (var i = 0; i < evo.Count; i++)
+                {
+                    var p = evo[i];
+                    <circle cx="@F(LX(i))" cy="@F(LY(p.Flora))" r="4" fill="@Biodiversidade.CorFlora" stroke="#fff" stroke-width="2" />
+                    <circle cx="@F(LX(i))" cy="@F(LY(p.Fauna))" r="4" fill="@Biodiversidade.CorFauna" stroke="#fff" stroke-width="2" />
+                    @:<text x="@F(LX(i))" y="@F(LH - 6)" text-anchor="middle">@Rotulos.MesAno(p.Mes).Split('/')[0]</text>
+                }
+                @if (evo.Count > 0)
+                {
+                    var ult = evo[^1];
+                    @:<text x="@F(LX(evo.Count - 1) + 7)" y="@F(LY(ult.Fauna) + 3)" style="fill:rgba(0,0,0,.8)">@ult.Fauna</text>
+                    @:<text x="@F(LX(evo.Count - 1) + 7)" y="@F(LY(ult.Flora) + 3)" style="fill:rgba(0,0,0,.8)">@ult.Flora</text>
+                }
+                @for (var i = 0; i < evo.Count; i++)
+                {
+                    var p = evo[i];
+                    var larg = evo.Count > 1 ? (LW - mEsq - mDir) / (evo.Count - 1) : 40;
+                    <g class="ff-hit" data-tip="@Rotulos.MesAno(p.Mes)&#10;Fauna: @p.Fauna registros&#10;Flora: @p.Flora registros">
+                        <line x1="@F(LX(i))" x2="@F(LX(i))" y1="@F(mTopo)" y2="@F(LH - mBase)" stroke="rgba(0,0,0,.35)" stroke-width="1" />
+                        <rect x="@F(LX(i) - larg / 2)" y="0" width="@F(larg)" height="@F(LH - mBase)" />
+                    </g>
+                }
+            </svg>
+            <details class="ff-tabela-dados">
+                <summary>Ver dados</summary>
+                <table>
+                    <tr><th>Mês</th><th>Fauna</th><th>Flora</th></tr>
+                    @foreach (var p in evo) { <tr><td>@Rotulos.MesAno(p.Mes)</td><td>@p.Fauna</td><td>@p.Flora</td></tr> }
+                </table>
+            </details>
+        </section>
+
+        <section class="cm-card ff-card">
+            <div class="ff-card__cab"><h2>Distribuição por grupo</h2></div>
+            <p class="ff-sub" style="margin-top:-6px">Espécies de fauna registradas</p>
+            @if (totalFatias == 0)
+            {
+                <p class="cm-ajuda">Sem registros de fauna ainda.</p>
+            }
+            else
+            {
+                <div class="ff-donut-linha">
+                    <svg class="ff-donut" viewBox="0 0 132 132" role="img" aria-label="Espécies de fauna por grupo">
+                        <circle cx="66" cy="66" r="@F(R)" fill="none" stroke="#f0f0f0" stroke-width="18" />
+                        @{
+                            double acumulado = 0;
+                        }
+                        @foreach (var f in Model.DistribuicaoFauna)
+                        {
+                            var comp = C * f.Quantidade / totalFatias;
+                            var visivel = Math.Max(comp - (Model.DistribuicaoFauna.Count > 1 ? 2 : 0), 0.5);
+                            <circle class="ff-fatia" cx="66" cy="66" r="@F(R)" fill="none" stroke="@f.Cor" stroke-width="18"
+                                    stroke-dasharray="@F(visivel) @F(C - visivel)" stroke-dashoffset="@F(-acumulado)"
+                                    transform="rotate(-90 66 66)" data-tip="@f.Grupo: @f.Quantidade espécie(s) · @f.Percentual%" />
+                            acumulado += comp;
+                        }
+                        <text x="66" y="64" text-anchor="middle" style="font-family:var(--cm-fonte-titulo);font-size:26px;fill:rgba(0,0,0,.87)">@Model.TotalEspeciesFauna</text>
+                        <text x="66" y="82" text-anchor="middle" style="font-size:11px;fill:rgba(0,0,0,.6)">espécies</text>
+                    </svg>
+                    <ul class="ff-donut-lista">
+                        @foreach (var f in Model.DistribuicaoFauna)
+                        {
+                            <li><i style="background:@f.Cor"></i>@f.Grupo<b>@f.Percentual%</b></li>
+                        }
+                    </ul>
+                </div>
+            }
+        </section>
+
+        <section class="cm-card ff-card">
+            <div class="ff-card__cab"><h2>Explore e aprenda</h2></div>
+            <div class="ff-explore">
+                <a href="/certificacao/fauna-flora/especies?reino=FAUNA">
+                    @Html.Foto(null, Biodiversidade.GruposFauna[1])
+                    <span><b>Conheça nossa fauna</b><small>Saiba mais sobre as espécies que vivem em nossas áreas.</small></span>
+                </a>
+                <a href="/certificacao/fauna-flora/especies?reino=FLORA">
+                    @Html.Foto(null, Biodiversidade.GruposFlora[3])
+                    <span><b>Conheça nossa flora</b><small>Descubra as principais espécies nativas e sua importância.</small></span>
+                </a>
+                <a href="#" data-abrir-modal="modal-boas-praticas">
+                    @Html.Foto(null, Biodiversidade.GruposFlora[0])
+                    <span><b>Boas práticas ambientais</b><small>Como cada cooperado pode contribuir para a conservação.</small></span>
+                </a>
+            </div>
+        </section>
+    </div>
+
+    <partial name="_ModalRegistro" model="new ModalRegistroViewModel { Especies = Model.Especies, Propriedades = Model.Propriedades, Voltar = Context.Request.Path + Context.Request.QueryString }" />
+
+    <dialog class="cm-modal" id="modal-boas-praticas" aria-labelledby="titulo-bp">
+        <div class="cm-modal__cab">
+            <h2 class="cm-modal__titulo" id="titulo-bp">Boas práticas ambientais</h2>
+            <button type="button" class="cm-icone-btn" data-fechar-modal aria-label="Fechar">@Html.Icone("close")</button>
+        </div>
+        <div class="cm-modal__corpo">
+            <ol class="ff-dicas">
+                <li><b>Conserve Reserva Legal e APP.</b> Mantenha cercadas as nascentes e margens de córregos e não use fogo nessas áreas.</li>
+                <li><b>Ligue os fragmentos.</b> Corredores de vegetação nativa entre matas permitem que os animais circulem com segurança.</li>
+                <li><b>Não cace, não capture e não alimente animais silvestres.</b> Oriente funcionários e visitantes — é exigência das certificações.</li>
+                <li><b>Registre o que vê.</b> Cada avistamento, vestígio ou foto de câmera vira evidência de biodiversidade para a auditoria.</li>
+                <li><b>Reduza a velocidade nas estradas internas</b> ao amanhecer e ao entardecer, quando os animais mais se deslocam.</li>
+                <li><b>Aplique agroquímicos com responsabilidade</b>, respeitando faixas de proteção de APP e corpos d'água.</li>
+                <li><b>Controle espécies invasoras</b> e prefira mudas nativas do Cerrado em recomposições.</li>
+            </ol>
+        </div>
+        <div class="cm-modal__acoes"><button type="button" class="cm-btn cm-btn--primario" data-fechar-modal>Entendi</button></div>
+    </dialog>
+</div>
+<link rel="stylesheet" href="~/_content/AgroCert.Certificacao/lib/leaflet/leaflet.css" />
+<script type="application/json" id="ff-dados-mapa">@Html.Raw(dadosMapa)</script>
+<script src="~/_content/AgroCert.Certificacao/lib/leaflet/leaflet.js"></script>
+<script src="~/_content/AgroCert.Certificacao/js/fauna-flora-mapa.js" asp-append-version="true"></script>
+<partial name="_Scripts" />

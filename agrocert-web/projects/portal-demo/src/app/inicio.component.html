@@ -1,0 +1,125 @@
+<section class="in-banner" role="img" aria-label="Muito além do campo">
+  <svg class="in-banner__fundo" viewBox="0 0 1200 130" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+    <defs>
+      <linearGradient id="in-ceu" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stop-color="#cfe6c4" /><stop offset="1" stop-color="#9cc98a" />
+      </linearGradient>
+      <linearGradient id="in-morro1" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stop-color="#7cb85c" /><stop offset="1" stop-color="#4f8f37" />
+      </linearGradient>
+      <linearGradient id="in-morro2" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stop-color="#5fa043" /><stop offset="1" stop-color="#2f6a25" />
+      </linearGradient>
+      <linearGradient id="in-morro3" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stop-color="#4c8f36" /><stop offset="1" stop-color="#2b5d22" />
+      </linearGradient>
+    </defs>
+    <rect width="1200" height="130" fill="url(#in-ceu)" />
+    <path d="M0 62 C180 38 330 44 520 58 S860 30 1200 46 V130 H0Z" fill="#8fc274" opacity=".8" />
+    <path d="M0 74 C220 52 420 60 640 76 S980 54 1200 64 V130 H0Z" fill="url(#in-morro1)" />
+    <g fill="none" stroke="#8fcd6c" stroke-opacity=".55" stroke-width="2">
+      <path d="M120 130 C260 96 400 84 560 82" /><path d="M220 130 C360 100 470 92 600 90" />
+      <path d="M760 130 C860 98 980 82 1140 74" /><path d="M860 130 C960 104 1060 92 1200 86" />
+    </g>
+    <path d="M0 100 C260 80 520 88 760 104 S1060 92 1200 98 V130 H0Z" fill="url(#in-morro2)" />
+    <path d="M0 116 C300 104 620 110 900 120 S1120 112 1200 116 V130 H0Z" fill="url(#in-morro3)" />
+    <g transform="translate(860 34)">
+      <rect x="-3" y="18" width="6" height="22" fill="#4b3a26" />
+      <ellipse cx="0" cy="14" rx="24" ry="16" fill="#3f7a2f" />
+      <ellipse cx="-10" cy="10" rx="12" ry="9" fill="#4d8b39" />
+    </g>
+  </svg>
+  <img *ngIf="bannerTentativa < BANNERS.length" class="in-banner__foto" [src]="BANNERS[bannerTentativa]" alt="" aria-hidden="true" (error)="bannerTentativa = bannerTentativa + 1" />
+</section>
+
+<div class="in-conteudo">
+  <p class="in-boasvindas">Bem-vindo(a) de volta, <span>{{ nome }}</span> !</p>
+
+  <h2 class="in-secao"><span class="material-icons" aria-hidden="true">folder</span> Seu estoque atual</h2>
+  <p class="in-atualizacao">Última atualização: {{ atualizacao }}</p>
+
+  <div class="in-estoque">
+    <article class="in-produto" *ngFor="let p of estoque">
+      <img class="in-produto__foto" [src]="p.arquivo" [alt]="p.produto" (error)="semFoto(p)" />
+      <div class="in-produto__texto">
+        <b>{{ p.produto }}</b>
+        <span>{{ formatar(p.quantidade) }} <small>{{ p.unidade }}</small></span>
+      </div>
+    </article>
+  </div>
+
+  <h2 class="in-secao in-secao--espaco"><span class="material-icons" aria-hidden="true">insights</span> Cotações Agrícolas</h2>
+  <div class="in-cotacoes">
+    <table class="in-tabela">
+      <thead><tr><th class="in-esq">Produto</th><th>Data de Pagamento</th><th>Pequeno volume</th><th>Grande volume</th></tr></thead>
+      <tbody>
+        <tr *ngFor="let c of paginaCotacoes()">
+          <td class="in-esq">{{ c.produto }}</td><td>{{ dataBr(c.pagamento) }}</td><td>{{ moeda(c.pequeno) }}</td><td>{{ moeda(c.grande) }}</td>
+        </tr>
+      </tbody>
+    </table>
+    <div class="in-paginacao">
+      <span>Itens por página</span>
+      <select [value]="porPagina" (change)="porPagina = +$any($event.target).value; paginaCot = 0" aria-label="Itens por página">
+        <option value="5">5</option><option value="10">10</option><option value="25">25</option>
+      </select>
+    </div>
+    <div class="in-paginacao in-paginacao--nav">
+      <span>Página: {{ paginaCot + 1 }} de {{ totalPagCot() }}</span>
+      <button type="button" aria-label="Primeira página" [disabled]="paginaCot === 0" (click)="paginaCot = 0"><span class="material-icons">first_page</span></button>
+      <button type="button" aria-label="Página anterior" [disabled]="paginaCot === 0" (click)="paginaCot = paginaCot - 1"><span class="material-icons">chevron_left</span></button>
+      <button type="button" aria-label="Próxima página" [disabled]="paginaCot >= totalPagCot() - 1" (click)="paginaCot = paginaCot + 1"><span class="material-icons">chevron_right</span></button>
+      <button type="button" aria-label="Última página" [disabled]="paginaCot >= totalPagCot() - 1" (click)="paginaCot = totalPagCot() - 1"><span class="material-icons">last_page</span></button>
+    </div>
+  </div>
+
+  <h2 class="in-secao in-secao--espaco"><span class="material-icons" aria-hidden="true">how_to_reg</span> Últimas visitas técnicas</h2>
+  <div class="in-cards">
+    <a class="in-card" *ngFor="let v of ultimasVisitas" [routerLink]="['/portal/visita-tecnica', v.id]">
+      <span class="in-card__data">{{ dataBr(v.data) }}</span>
+      <span class="in-card__rotulo">Cooperado</span>
+      <span class="in-card__nome">{{ v.cooperado }}</span>
+      <div class="in-card__colunas">
+        <div><span class="in-card__rotulo">Cultura</span><span class="in-card__valor">{{ v.cultura.toUpperCase() }}</span></div>
+        <div><span class="in-card__rotulo">Nº<br>Visita</span><span class="in-card__valor">{{ v.numero }}</span></div>
+        <div><span class="in-card__rotulo">Produtos<br>Recomendados</span><span class="in-card__valor in-verde">{{ v.recomendacoes.length }}</span></div>
+      </div>
+    </a>
+    <p *ngIf="!ultimasVisitas.length" class="in-vazio">Nenhuma visita registrada.</p>
+  </div>
+
+  <h2 class="in-secao in-secao--espaco"><span class="material-icons" aria-hidden="true">monetization_on</span> Últimas vendas</h2>
+  <div class="in-cards">
+    <article class="in-card" *ngFor="let v of ultimasVendas">
+      <div class="in-card__topo">
+        <span class="in-card__data">{{ dataBr(v.data) }}</span>
+        <span class="in-selo" [ngClass]="v.situacao === 'Faturada e Efetivada' ? 'in-selo--ok' : 'in-selo--aviso'">{{ v.situacao }}</span>
+      </div>
+      <span class="in-card__rotulo">Cliente</span>
+      <span class="in-card__nome">{{ v.cliente }}</span>
+      <div class="in-card__colunas">
+        <div><span class="in-card__rotulo">Cultura</span><span class="in-card__valor">{{ v.cultura }}</span></div>
+        <div><span class="in-card__rotulo">Nº OV</span><span class="in-card__valor">{{ v.ov }}</span></div>
+        <div><span class="in-card__rotulo">Valor Total</span><span class="in-card__valor in-verde in-forte">{{ moeda(v.valor) }}</span></div>
+      </div>
+    </article>
+  </div>
+
+  <h2 class="in-secao in-secao--espaco"><span class="material-icons" aria-hidden="true">assessment</span> Resumo de vendas</h2>
+  <div class="in-periodos">
+    <button type="button" [class.ativo]="periodo === 'hoje'" (click)="periodo = 'hoje'">Hoje</button>
+    <button type="button" [class.ativo]="periodo === 'semana'" (click)="periodo = 'semana'">Última semana</button>
+    <button type="button" [class.ativo]="periodo === 'mes'" (click)="periodo = 'mes'">Último mês</button>
+    <button type="button" aria-label="Atualizar" title="Atualizar" (click)="atualizarResumo()"><span class="material-icons">refresh</span></button>
+  </div>
+  <div class="in-resumo">
+    <div class="in-kpi"><span class="in-kpi__icone in-kpi__icone--ok material-icons">check</span>
+      <div><b>{{ resumo[periodo].vendas }}</b><small>Vendas concluídas</small></div></div>
+    <div class="in-kpi"><span class="in-kpi__icone in-kpi__icone--azul">$</span>
+      <div><b>{{ moeda(resumo[periodo].valor) }}</b><small>Vendidos</small></div></div>
+    <div class="in-kpi"><span class="in-kpi__icone in-kpi__icone--pessoa material-icons">person_outline</span>
+      <div><b class="in-kpi__nome">{{ resumo[periodo].produtor }}</b><small>Produtor com mais vendas</small></div></div>
+  </div>
+
+  <p class="in-exemplo">Valores, nomes e empresas de exemplo (ambiente de teste). No portal, estoque, cotações e vendas vêm do ERP e as visitas, do próprio portal.</p>
+</div>

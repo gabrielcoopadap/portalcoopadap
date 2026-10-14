@@ -1,0 +1,258 @@
+<ac-estado [carregando]="!r && !erro" [erro]="erro" texto="Carregando relatório..." (tentarDeNovo)="carregar()"></ac-estado>
+
+<div class="rc-relatorio" *ngIf="r as r">
+  <div class="rc-barra ac-nao-imprimir">
+    <a class="rc-btn rc-btn--texto" [routerLink]="['ambiental', r.propriedadeId] | acRota"><span class="material-icons">arrow_back</span> Voltar ao imóvel</a>
+    <span class="rc-barra__dica" role="status">{{ dica }}</span>
+    <button type="button" class="rc-btn" (click)="imprimir()"><span class="material-icons">picture_as_pdf</span> Gerar PDF</button>
+  </div>
+
+  <main class="rc-folha ac-imprimir">
+    <header class="rc-cab">
+      <img *ngIf="!logoFalhou" class="rc-logo" src="img/logo-coopadap.png" alt="Coopadap" (error)="logoFalhou = true" />
+      <div *ngIf="logoFalhou" class="rc-logo-txt"><span class="material-icons">spa</span> coopadap</div>
+      <div class="rc-cab__tit">
+        <div class="rc-cab__h1">Relatório de Conformidade Ambiental</div>
+        <div class="rc-cab__sub">Desmatamento por data de corte · Unidades de conservação · emitido em {{ hoje }}</div>
+      </div>
+    </header>
+
+    <section class="rc-imovel">
+      <div class="rc-imovel__nome">{{ r.nome }}</div>
+      <div class="rc-imovel__dados">
+        <span><b>CAR</b> {{ r.car }}</span>
+        <span *ngIf="r.municipio !== null"><b>Município</b> {{ r.municipio }}/{{ r.uf }}</span>
+        <span><b>Área</b> {{ ha(r.areaHa) }}</span>
+        <span *ngIf="r.areaReservaLegalHa !== null"><b>Reserva Legal</b> {{ ha(r.areaReservaLegalHa) }}</span>
+        <span *ngIf="r.areaAppHa !== null"><b>APP</b> {{ ha(r.areaAppHa) }}</span>
+      </div>
+    </section>
+
+    <div class="rc-conclusao rc-conclusao--{{ conclusaoClasse }}">{{ conclusao }}</div>
+
+    <h2 class="rc-h2"><span class="material-icons">fact_check</span> Parecer por critério</h2>
+    <table class="rc-tab rc-parecer">
+      <thead><tr><th>Norma</th><th>Critério</th><th>Situação</th><th>O que foi encontrado</th></tr></thead>
+      <tbody>
+        <tr *ngFor="let c of r.criterios">
+          <td class="rc-norma">{{ c.norma }}</td>
+          <td><b>{{ c.titulo }}</b><div class="rc-sub">{{ c.exigencia }}</div></td>
+          <td><span class="rc-st rc-st--{{ classeStatus(c.status) }}"><span class="material-icons">{{ iconeStatus(c.status) }}</span>{{ rotuloStatus(c.status) }}</span></td>
+          <td>{{ c.resultado }} <div *ngIf="c.observacao != null" class="rc-sub">{{ c.observacao }}</div></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <p class="rc-nota" *ngIf="r.marcos.length > 0">
+      Mapas do MapBiomas usados:
+      {{ notaMarcos }} · situação atual → mapa de {{ r.anoAtual }}.
+    </p>
+
+    <ng-container *ngIf="r.mapaMudanca">
+      <h2 class="rc-h2"><span class="material-icons">map</span> Mapa do imóvel — o que mudou desde {{ anoMarco2008 ?? (r.anosComparados.length > 0 ? r.anosComparados[0] : 0) }}</h2>
+      <div class="rc-mapa" #mapaEl></div>
+      <div class="rc-legenda">
+        <span *ngFor="let l of r.legendaMudanca"><i [style.background]="l.cor"></i>{{ l.texto }}</span>
+        <span><i class="rc-l-imovel"></i>Limite do imóvel</span>
+        <span><i class="rc-l-rl"></i>Reserva Legal</span>
+        <span><i class="rc-l-app"></i>APP</span>
+        <span *ngIf="r.ucsGeoJson"><i class="rc-l-uc"></i>Unidade de conservação</span>
+      </div>
+      <div class="rc-numeros">
+        <div><b>{{ ha(r.conversaoTotalHa) }}</b><span>convertidos desde {{ anoMarco2008 }} em {{ r.areas.length }} área(s)</span></div>
+        <div><b>{{ ha(r.regeneracaoHa) }}</b><span>voltaram a ser vegetação nativa</span></div>
+        <div><b>{{ nativaAtual }}</b><span>de vegetação nativa em {{ r.anoAtual }}</span></div>
+        <div><b>{{ r.alertas.length }}</b><span>alerta(s) do MapBiomas Alerta</span></div>
+      </div>
+    </ng-container>
+
+    <section class="rc-bloco" *ngIf="r.porArea.length > 0">
+      <h2 class="rc-h2"><span class="material-icons">table_chart</span> Vegetação nativa por área do imóvel</h2>
+      <table class="rc-tab rc-tab--num">
+        <thead>
+          <tr><th>Área</th><th>Tamanho</th><th *ngFor="let a of r.anosComparados">{{ a }}</th><th>Variação</th></tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let l of r.porArea">
+            <td><b>{{ l.area }}</b></td>
+            <td>{{ ha(l.areaHa) }}</td>
+            <td *ngFor="let a of r.anosComparados">{{ ha(v(l.nativaHa, a)) }}<div class="rc-sub">{{ pct(v(l.nativaHa, a), l.areaHa) }}</div></td>
+            <td [class.rc-neg]="variacao(l) < -0.5" [class.rc-pos]="variacao(l) > 0.5">{{ variacao(l) > 0 ? '+' : '' }}{{ ha(variacao(l)) }}</td>
+          </tr>
+        </tbody>
+      </table>
+      <p class="rc-nota">Vegetação nativa = formações florestal, savânica e campestre, campos alagados e afloramentos (classes naturais do MapBiomas). Áreas medidas pelos pixels de 30 m do mapa, por isso diferem um pouco das áreas declaradas no CAR.</p>
+
+      <ng-container *ngIf="r.classes.length > 0">
+        <h3 class="rc-h3">Uso do solo dentro do imóvel</h3>
+        <table class="rc-tab rc-tab--num rc-tab--classes">
+          <thead><tr><th>Classe (MapBiomas)</th><th *ngFor="let a of r.anosComparados">{{ a }}</th></tr></thead>
+          <tbody>
+            <tr *ngFor="let c of classesTabela">
+              <td><i class="rc-q" [style.background]="c.cor"></i>{{ c.nome }} <span *ngIf="c.natural" class="rc-nat">nativa</span></td>
+              <td *ngFor="let a of r.anosComparados">{{ ha(v(c.ha, a)) }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </ng-container>
+    </section>
+
+    <section class="rc-bloco" *ngIf="r.imovel">
+      <h2 class="rc-h2"><span class="material-icons">compare</span> Imóvel inteiro — antes × depois</h2>
+      <ng-container *ngFor="let f of figurasImovel">
+        <ng-container *ngTemplateOutlet="figuras; context: { $implicit: f }"></ng-container>
+      </ng-container>
+      <ng-container *ngTemplateOutlet="legendaClasses"></ng-container>
+    </section>
+
+    <section class="rc-bloco" *ngIf="r.mapaMudanca">
+      <h2 class="rc-h2"><span class="material-icons">crop_free</span> Áreas onde a vegetação nativa foi convertida</h2>
+      <p *ngIf="r.areas.length === 0" class="rc-texto rc-texto--ok"><span class="material-icons">verified</span> Nenhuma área de vegetação nativa convertida em uso agropecuário depois de {{ anoMarco2008 }} dentro do imóvel (manchas a partir de 0,4 ha).</p>
+      <ng-container *ngIf="r.areas.length > 0">
+        <p class="rc-texto">Cada área abaixo era vegetação nativa num dos marcos e no mapa de {{ r.anoAtual }} tem uso agropecuário. Compare as imagens de antes e depois; o contorno vermelho marca a área. Confirme em campo — o mapa de 30 m pode errar em bordas e em áreas de cerrado ralo.</p>
+        <table class="rc-tab rc-tab--num rc-resumo-areas">
+          <thead><tr><th>Nº</th><th>Área</th><th>Quando</th><th>Antes → depois</th><th>Na RL</th><th>Na APP</th><th>Período</th></tr></thead>
+          <tbody>
+            <tr *ngFor="let a of r.areas">
+              <td><span class="rc-num" [style.background]="corMarco(a.marco)">{{ a.numero }}</span></td>
+              <td><b>{{ ha(a.areaHa) }}</b></td>
+              <td>{{ a.anoNatural === null ? '—' : a.anoNatural + ' → ' + (a.anoConvertida ?? '') }}</td>
+              <td>{{ a.classeAntes }} → {{ a.classeDepois }}</td>
+              <td>{{ a.naReservaLegalHa > 0 ? ha(a.naReservaLegalHa) : '—' }}</td>
+              <td>{{ a.naAppHa > 0 ? ha(a.naAppHa) : '—' }}</td>
+              <td>{{ a.periodo }}</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <article class="rc-area" *ngFor="let a of areasComFiguras">
+          <div class="rc-area__cab">
+            <span class="rc-num rc-num--g" [style.background]="corMarco(a.marco)">{{ a.numero }}</span>
+            <div>
+              <div class="rc-area__tit">Área {{ a.numero }} — {{ ha(a.areaHa) }} · {{ a.periodo }}</div>
+              <div class="rc-sub">
+                {{ a.anoNatural === null ? '' : 'Vegetação nativa (' + a.classeAntes + ') em ' + a.anoNatural + '; ' }}{{ a.classeDepois }} em {{ a.anoConvertida ?? r.anoAtual }}.
+                <b *ngIf="a.naReservaLegalHa > 0"> {{ ha(a.naReservaLegalHa) }} dentro da Reserva Legal.</b>
+                <b *ngIf="a.naAppHa > 0"> {{ ha(a.naAppHa) }} dentro de APP.</b>
+                Coordenadas: {{ coord(a.lat) }}, {{ coord(a.lon) }}
+              </div>
+            </div>
+          </div>
+          <ng-container *ngFor="let f of figurasDaArea(a.numero)">
+            <ng-container *ngTemplateOutlet="figuras; context: { $implicit: f }"></ng-container>
+          </ng-container>
+        </article>
+        <ng-container *ngTemplateOutlet="legendaClasses"></ng-container>
+      </ng-container>
+    </section>
+
+    <section class="rc-bloco">
+      <h2 class="rc-h2"><span class="material-icons">park</span> Unidades de conservação e zonas de amortecimento</h2>
+      <p *ngIf="!r.ucComDados" class="rc-texto">Camada de unidades de conservação não carregada. Coloque o shapefile do CNUC (MMA) — pode ser o .zip baixado — na pasta <code>{{ r.pastaUcs }}</code>.</p>
+      <p *ngIf="r.ucComDados && r.ucs.length === 0" class="rc-texto rc-texto--ok"><span class="material-icons">verified</span> Nenhuma unidade de conservação a menos de 10 km do imóvel.</p>
+      <table *ngIf="r.ucComDados && r.ucs.length > 0" class="rc-tab">
+        <thead><tr><th>Unidade de conservação</th><th>Grupo</th><th>Distância</th><th>Situação</th></tr></thead>
+        <tbody>
+          <tr *ngFor="let u of r.ucs">
+            <td><b>{{ u.nome }}</b><div *ngIf="u.categoria !== null" class="rc-sub">{{ u.categoria }}{{ u.esfera === null ? '' : ' · ' + u.esfera }}</div></td>
+            <td>{{ u.ehZonaAmortecimento ? 'Zona de amortecimento' : u.grupo }}</td>
+            <td>{{ u.dentro ? (u.areaDentroHa === null ? 'dentro' : 'dentro (' + ha(u.areaDentroHa) + ')') : distancia(u.distanciaM) }}</td>
+            <td><span class="rc-st rc-st--{{ classeStatus(u.status) }}"><span class="material-icons">{{ iconeStatus(u.status) }}</span>{{ rotuloStatus(u.status) }}</span><div class="rc-sub">{{ u.situacao }}</div></td>
+          </tr>
+        </tbody>
+      </table>
+      <p class="rc-nota">Quando a UC não tem zona de amortecimento definida, foi usada a faixa de {{ raioKm(r.raioAmortecimentoM) }} km (Resolução CONAMA 428/2010). APA e RPPN não têm zona de amortecimento (Lei 9.985/2000, art. 25). A produção dentro de UC de uso sustentável pode ser permitida pelo plano de manejo.</p>
+    </section>
+
+    <section class="rc-bloco">
+      <h2 class="rc-h2"><span class="material-icons">notification_important</span> Alertas de desmatamento (MapBiomas Alerta)</h2>
+      <p *ngIf="r.alertas.length === 0" class="rc-texto rc-texto--ok"><span class="material-icons">verified</span> Nenhum alerta registrado dentro do imóvel.</p>
+      <table *ngIf="r.alertas.length > 0" class="rc-tab">
+        <thead><tr><th>Alerta</th><th>Data</th><th>Área</th><th>Onde</th><th>Antes × depois</th></tr></thead>
+        <tbody>
+          <tr *ngFor="let a of r.alertas">
+            <td><b>{{ a.codigoAlerta }}</b><div class="rc-sub">{{ a.classeDesmatamento }}</div></td>
+            <td>{{ a.dataDeteccao | acData }}</td>
+            <td>{{ ha(a.areaHa) }}</td>
+            <td>{{ a.dentroReservaLegal === true ? 'Reserva Legal ' : '' }}{{ a.dentroApp === true ? 'APP' : '' }}</td>
+            <td class="rc-alerta-imgs">
+              <img *ngIf="a.imagemAntesUrl" [src]="a.imagemAntesUrl | acArquivo" alt="Antes" />
+              <img *ngIf="a.imagemDepoisUrl" [src]="a.imagemDepoisUrl | acArquivo" alt="Depois" />
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="rc-bloco" *ngIf="r.ndvi.length > 0">
+      <h2 class="rc-h2"><span class="material-icons">grass</span> NDVI mensal do imóvel (Sentinel-2)</h2>
+      <div class="rc-ndvi">
+        <div class="rc-ndvi__barra" *ngFor="let n of serieNdvi" [title]="mesAno(n.dataImagem) + ': ' + ndviTexto(n.ndviMedio)">
+          <span class="rc-ndvi__v">{{ ndviTexto(n.ndviMedio) }}</span>
+          <i [style.height]="ndviAltura(n.ndviMedio)" [style.background]="ndviCor(n.ndviMedio)"></i>
+          <span class="rc-ndvi__m">{{ mesAno(n.dataImagem) }}</span>
+        </div>
+      </div>
+      <p class="rc-nota">NDVI médio dentro do limite do imóvel. Quedas bruscas que não voltam no ano seguinte merecem verificação; quedas na seca e na colheita são normais.</p>
+    </section>
+
+    <section class="rc-bloco">
+      <h2 class="rc-h2"><span class="material-icons">menu_book</span> Como foi feito</h2>
+      <ul class="rc-lista">
+        <li>Os mapas anuais do MapBiomas de cada data de corte foram comparados pixel a pixel com o mapa mais recente, dentro do limite do CAR. Conta como conversão o pixel que era vegetação nativa no marco e tem uso agropecuário (pastagem, lavoura, silvicultura, mosaico de usos, área urbana ou mineração) no mapa atual.</li>
+        <li>Pixels vizinhos foram agrupados em áreas; manchas menores que 0,4 ha foram desconsideradas por serem, em geral, erro de classificação.</li>
+        <li>As imagens Sentinel-2 são da estação seca (junho a setembro) de cada ano, na cena com menos nuvem. A de 2016 é a mais antiga disponível com 10 m.</li>
+        <li>A autorização de supressão (ASV/DAIA) não aparece em mapas: para as áreas convertidas após 22/07/2008 é preciso apresentar o documento.</li>
+      </ul>
+      <h3 class="rc-h3">Fontes</h3>
+      <ul class="rc-lista"><li *ngFor="let f of r.fontes">{{ f }}</li></ul>
+      <ng-container *ngIf="r.avisos.length > 0">
+        <h3 class="rc-h3">Observações</h3>
+        <ul class="rc-lista rc-lista--aviso"><li *ngFor="let a of r.avisos">{{ a }}</li></ul>
+      </ng-container>
+      <p class="rc-nota">Relatório de monitoramento baseado em dados públicos de sensoriamento remoto. Não substitui vistoria de campo nem constitui certificação ou parecer jurídico.</p>
+      <div class="rc-assinaturas"><div>Responsável técnico</div><div>Produtor</div></div>
+    </section>
+    <div class="rc-rodape">{{ r.nome }} · CAR {{ r.car }} · emitido em {{ hoje }}</div>
+  </main>
+
+  <ng-template #figuras let-f>
+    <div class="rc-figs">
+      <div class="rc-figs__tit">{{ f.titulo }}</div>
+      <div class="rc-figs__linha">
+        <figure class="rc-fig" *ngFor="let it of f.itens">
+          <div class="rc-fig__img" [style.aspect-ratio]="f.janela.proporcaoLarguraAltura">
+            <ng-container *ngIf="!it.satelite">
+              <div *ngIf="!it.src" class="rc-fig__falta">sem mapa</div>
+              <img *ngIf="it.src && !it.falhou" [src]="it.src" [alt]="it.rotulo" (error)="it.falhou = true" />
+              <div *ngIf="it.src && it.falhou" class="rc-fig__falta">imagem indisponível</div>
+            </ng-container>
+            <ng-container *ngIf="it.satelite">
+              <ng-container *ngIf="{ src: it.satelite | async } as s">
+                <img *ngIf="s.src && !it.falhou" [src]="s.src" [alt]="it.rotulo" (error)="it.falhou = true" />
+                <div *ngIf="s.src === null || it.falhou" class="rc-fig__falta">imagem indisponível</div>
+              </ng-container>
+            </ng-container>
+            <svg [attr.viewBox]="f.viewBox" preserveAspectRatio="none">
+              <path *ngIf="f.janela.contornoApp" class="rc-c-app" [attr.d]="f.janela.contornoApp" />
+              <path *ngIf="f.janela.contornoRl" class="rc-c-rl" [attr.d]="f.janela.contornoRl" />
+              <path *ngIf="f.imovel" class="rc-c-imovel" [attr.d]="f.janela.contornoPrincipal" />
+              <ng-container *ngIf="!f.imovel">
+                <path *ngIf="f.janela.contornoImovel" class="rc-c-imovel" [attr.d]="f.janela.contornoImovel" />
+                <path class="rc-c-area" [attr.d]="f.janela.contornoPrincipal" />
+              </ng-container>
+            </svg>
+          </div>
+          <figcaption>{{ it.rotulo }}</figcaption>
+        </figure>
+      </div>
+    </div>
+  </ng-template>
+
+  <ng-template #legendaClasses>
+    <div class="rc-legenda rc-legenda--classes">
+      <span *ngFor="let c of classesLegenda"><i [style.background]="c.cor"></i>{{ c.nome }}</span>
+      <span><i class="rc-l-imovel"></i>Limite do imóvel</span><span><i class="rc-l-area"></i>Área convertida</span><span><i class="rc-l-rl"></i>Reserva Legal</span>
+    </div>
+  </ng-template>
+</div>

@@ -1,0 +1,154 @@
+@model ValidacaoDto?
+@{
+    ViewData["Title"] = "Clima · Validação do modelo";
+    var antecedencia = ViewData["Parametros"] as int? ?? 6;
+    var v = Model;
+    var ordem = new[] { "chuva", "maxima", "minima", "temp_ambiente", "umidade_relativa" };
+
+    const double W = 360, H = 190, mE = 36, mD = 8, mT = 14, mB = 24;
+    var larg = (W - mE - mD) / 12;
+    double X(int mes) => mE + larg * (mes - 1) + larg / 2;
+    List<(int Mes, ValidacaoMesDto D)> PorMes(string variavel) =>
+        v?.PorMes.Where(k => k.Key.StartsWith(variavel + "|"))
+            .Select(k => (int.Parse(k.Key.Split('|')[1]), k.Value)).OrderBy(t => t.Item1).ToList()
+        ?? new List<(int, ValidacaoMesDto)>();
+    var paineis = new[] { ("chuva", "Chuva"), ("maxima", "Temperatura máxima") };
+    var lim = Math.Max(5, paineis.SelectMany(p => PorMes(p.Item1)).Select(t => Math.Abs(t.D.GanhoPct)).DefaultIfEmpty(5).Max());
+    var topo = Math.Ceiling(lim / 5) * 5;
+    double Y(double g) => mT + (H - mT - mB) * (topo - g) / (2 * topo);
+
+    string Barra(double x, double w, double g)
+    {
+        double y0 = Y(0), y1 = Y(g), h = Math.Abs(y1 - y0);
+        if (h < 0.5) return "";
+        var r = Math.Min(3, Math.Min(w / 2, h));
+        return g >= 0
+            ? $"M{F(x)},{F(y0)} V{F(y1 + r)} Q{F(x)},{F(y1)} {F(x + r)},{F(y1)} H{F(x + w - r)} Q{F(x + w)},{F(y1)} {F(x + w)},{F(y1 + r)} V{F(y0)} Z"
+            : $"M{F(x)},{F(y0)} V{F(y1 - r)} Q{F(x)},{F(y1)} {F(x + r)},{F(y1)} H{F(x + w - r)} Q{F(x + w)},{F(y1)} {F(x + w)},{F(y1 - r)} V{F(y0)} Z";
+    }
+
+    string Ganho(double g) => g >= 0.05 ? $"erra {N(g)}% menos" : g <= -0.05 ? $"erra {N(-g)}% mais" : "empata";
+}
+<div class="cert-modulo clima-modulo">
+    <partial name="_RecursosClima" />
+
+    <form class="cm-card cl-filtros cl-filtros--curto" method="get" action="/clima/validacao">
+        <div class="cm-campo">
+            <label for="cl-ant">ONI previsto com antecedência de</label>
+            <select id="cl-ant" class="cm-select" name="antecedencia" onchange="this.form.submit()">
+                @foreach (var a in new[] { 3, 6, 9, 12 })
+                {
+                    <option value="@a" selected="@(a == antecedencia)">@a meses</option>
+                }
+            </select>
+        </div>
+        <p class="cm-ajuda cl-filtros__ajuda">
+            Cada ano da série é previsto com o modelo ajustado <b>sem</b> aquele ano. Assim dá para ver quanto o El Niño/La Niña
+            realmente melhora a previsão nesta estação — e quanto a regra antiga (−15% de chuva no El Niño) atrapalhava.
+        </p>
+    </form>
+
+    @if (v is not null)
+    {
+        <section class="cm-card cm-tabela-wrap">
+            <div class="cl-card__cab cl-card__cab--pad"><h2>Erro médio por variável</h2><span class="cm-contador">@v.Anos</span></div>
+            <div class="cm-tabela-scroll">
+                <table class="cm-tabela cl-tabela">
+                    <thead>
+                        <tr>
+                            <th>Variável</th>
+                            <th class="cl-num">Só a média histórica</th>
+                            <th class="cl-num">Regra antiga fixa</th>
+                            <th class="cl-num">Com ENSO (ONI real)</th>
+                            <th class="cl-num">Com ENSO (ONI previsto @antecedencia m antes)</th>
+                            <th>Resultado</th>
+                            <th class="cl-num">Acerto da faixa 80%</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var nome in ordem.Where(o => v.PorVariavel.ContainsKey(o)))
+                        {
+                            var r = v.PorVariavel[nome];
+                            var u = Unidade(nome);
+                            var casas = nome == "chuva" || nome == "umidade_relativa" ? 1 : 2;
+                            <tr>
+                                <td><b>@NomeVariavel(nome)</b><div class="cm-t-sub">@r.Meses meses testados</div></td>
+                                <td class="cl-num">@N(r.ErroMedioClimatologia, casas) @u</td>
+                                <td class="cl-num">@N(r.ErroMedioMetodoAntigo, casas) @u</td>
+                                <td class="cl-num"><b>@N(r.ErroMedioEnsoObservado, casas) @u</b></td>
+                                <td class="cl-num">@N(r.ErroMedioEnsoPrevisto, casas) @u</td>
+                                <td>
+                                    <div>@Html.Icone(r.GanhoVsClimatologiaPct >= 0.05 ? "arrow_downward" : r.GanhoVsClimatologiaPct <= -0.05 ? "arrow_upward" : "remove", "font-size:16px;vertical-align:-3px") vs. média: @Ganho(r.GanhoVsClimatologiaPct)</div>
+                                    <div class="cm-t-sub">vs. regra antiga: @Ganho(r.GanhoVsMetodoAntigoPct)</div>
+                                </td>
+                                <td class="cl-num">@Pct(r.CoberturaIntervalo80)</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+            <p class="cl-rodape">@v.ComoLer</p>
+        </section>
+
+        <div class="cl-duas">
+            @foreach (var (variavel, titulo) in paineis)
+            {
+                var dados = PorMes(variavel);
+                <section class="cm-card cl-card">
+                    <div class="cl-card__cab"><h2>@titulo: ganho por mês</h2><span class="cm-contador">% a menos de erro que a média</span></div>
+                    <svg class="ff-grafico cl-grafico" viewBox="0 0 @F(W) @F(H)" role="img" aria-label="Redução do erro com ENSO por mês — @titulo">
+                        @for (var g = -topo; g <= topo + 1e-6; g += topo / 2)
+                        {
+                            <line x1="@F(mE)" x2="@F(W - mD)" y1="@F(Y(g))" y2="@F(Y(g))" stroke="@(Math.Abs(g) < 1e-6 ? "#c3c2b7" : "#f0f0f0")" stroke-width="1" />
+                            @:<text x="@F(mE - 6)" y="@F(Y(g) + 3)" text-anchor="end">@S(g, 0)%</text>
+                        }
+                        @foreach (var (mes, d) in dados)
+                        {
+                            var bw = Math.Min(16, larg * 0.6);
+                            <path d="@Barra(X(mes) - bw / 2, bw, d.GanhoPct)" fill="#2a78d6" />
+                            @:<text x="@F(X(mes))" y="@F(H - 8)" text-anchor="middle">@(MesCurto(mes)[..1])</text>
+                            @if (Math.Abs(d.GanhoPct) >= topo * 0.4)
+                            {
+                                @:<text x="@F(X(mes))" y="@F(d.GanhoPct >= 0 ? Y(d.GanhoPct) - 4 : Y(d.GanhoPct) + 11)" text-anchor="middle" class="cl-rotulo-direto">@S(d.GanhoPct, 0)</text>
+                            }
+                        }
+                        @foreach (var (mes, d) in dados)
+                        {
+                            var u = Unidade(variavel);
+                            var dica = $"{NomeMes(mes)} · {titulo}\nErro só com a média: {N(d.ErroClimatologia, 2)} {u}\nErro com ENSO: {N(d.ErroEnso, 2)} {u}\nGanho: {S(d.GanhoPct)}%";
+                            <g class="ff-hit" data-tip="@dica">
+                                <line x1="@F(X(mes))" x2="@F(X(mes))" y1="@F(mT)" y2="@F(H - mB)" stroke="rgba(0,0,0,.25)" stroke-width="1" />
+                                <rect x="@F(X(mes) - larg / 2)" y="0" width="@F(larg)" height="@F(H)" />
+                            </g>
+                        }
+                    </svg>
+                </section>
+            }
+        </div>
+
+        <details class="cm-card cl-card cl-metodo">
+            <summary>Resultado separado por fase do ENSO</summary>
+            <div class="cm-tabela-scroll">
+                <table class="cm-tabela cl-tabela">
+                    <thead><tr><th>Variável · fase</th><th class="cl-num">Meses</th><th class="cl-num">Só a média</th><th class="cl-num">Regra antiga</th><th class="cl-num">Com ENSO</th><th class="cl-num">Ganho</th></tr></thead>
+                    <tbody>
+                        @foreach (var (chave, r) in v.PorFase.OrderBy(k => Array.IndexOf(ordem, k.Key.Split('|')[0])).ThenBy(k => k.Key))
+                        {
+                            var partes = chave.Split('|');
+                            <tr>
+                                <td>@NomeVariavel(partes[0]) · <span class="cl-fase @ClasseFase(partes[1])">@NomeFase(partes[1])</span></td>
+                                <td class="cl-num">@r.Meses</td>
+                                <td class="cl-num">@N(r.ErroMedioClimatologia, 2)</td>
+                                <td class="cl-num">@N(r.ErroMedioMetodoAntigo, 2)</td>
+                                <td class="cl-num">@N(r.ErroMedioEnsoObservado, 2)</td>
+                                <td class="cl-num">@S(r.GanhoVsClimatologiaPct)%</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+            <p class="cl-rodape">@v.Metodo</p>
+        </details>
+    }
+</div>
+<partial name="_ScriptsClima" />

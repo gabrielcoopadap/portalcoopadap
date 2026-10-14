@@ -1,0 +1,113 @@
+@model VistoriasViewModel
+@{
+    ViewData["Title"] = "Vistorias";
+    ViewData["MenuAtivo"] = "cert-vistorias";
+    var abas = new[] { ("TODAS", "Todas"), ("MENSAL_CONSULTORIA", "Mensais (Consultoria)"), ("DIARIA_FUNCIONARIO", "Diárias (Funcionário)") };
+    var mensais = Model.Todas.Count(v => v.Tipo == "MENSAL_CONSULTORIA");
+    var diarias = Model.Todas.Count(v => v.Tipo == "DIARIA_FUNCIONARIO");
+    var tipoSugerido = UsuarioAtual.EhConsultor(User) ? "MENSAL_CONSULTORIA" : "DIARIA_FUNCIONARIO";
+}
+<div class="cert-modulo">
+    <partial name="_Recursos" />
+
+    <div class="cm-topo">
+        <div>
+            <h1 class="cm-titulo">@Html.Icone("fact_check") Vistorias</h1>
+            <p class="cm-subtitulo">Vistorias mensais da consultoria e diárias da fazenda, com o mesmo formulário de conformidade</p>
+        </div>
+        <div class="cm-acoes">
+            <a class="cm-btn cm-btn--contorno" href="/certificacao/vistorias/pendencias">@Html.Icone("pending_actions") Pendências (@Model.Pendencias)</a>
+            <button type="button" class="cm-btn cm-btn--primario" data-abrir-modal="modal-vistoria">@Html.Icone("add") Nova Vistoria</button>
+        </div>
+    </div>
+
+    <section class="cm-stats">
+        <div class="cm-card cm-stat" style="--cor:#1f6fb2"><div class="cm-stat__valor">@Model.Todas.Count</div><div class="cm-stat__rotulo">Vistorias realizadas</div></div>
+        <div class="cm-card cm-stat" style="--cor:#5e9a42"><div class="cm-stat__valor">@mensais</div><div class="cm-stat__rotulo">Mensais (consultoria)</div></div>
+        <div class="cm-card cm-stat" style="--cor:#b8860b"><div class="cm-stat__valor">@diarias</div><div class="cm-stat__rotulo">Diárias (funcionário)</div></div>
+        <div class="cm-card cm-stat" style="--cor:#c0392b"><div class="cm-stat__valor">@Model.Pendencias</div><div class="cm-stat__rotulo">Pendências em aberto</div></div>
+    </section>
+
+    <div class="cm-abas-linha">
+        <nav class="cm-abas" aria-label="Tipo de vistoria">
+            @foreach (var (valor, rotulo) in abas)
+            {
+                <a class="cm-aba @(Model.Aba == valor ? "is-ativa" : "")" href="/certificacao/vistorias@(valor == "TODAS" ? "" : "?tipo=" + valor)">@rotulo</a>
+            }
+        </nav>
+        <span class="cm-contador">@Model.Filtradas.Count vistoria(s)</span>
+    </div>
+
+    <div class="cm-card cm-tabela-wrap">
+        <div class="cm-tabela-scroll">
+            <table class="cm-tabela">
+                <thead><tr><th>Código</th><th>Unidade / Propriedade</th><th>Tipo</th><th>Data</th><th>Responsável</th><th>Apontamentos</th></tr></thead>
+                <tbody>
+                    @if (Model.Filtradas.Count == 0)
+                    {
+                        <tr><td colspan="6" class="cm-tabela__vazio">Nenhuma vistoria registrada ainda.</td></tr>
+                    }
+                    @foreach (var v in Model.Filtradas)
+                    {
+                        <tr class="is-clicavel" data-link="/certificacao/vistorias/@v.Id" tabindex="0">
+                            <td><span class="cm-codigo">@v.CodigoDocumento</span></td>
+                            <td>
+                                <div class="cm-t-titulo">@v.UnidadePropriedade</div>
+                                @if (!string.IsNullOrWhiteSpace(v.SetorArea)) { <div class="cm-t-sub">@v.SetorArea</div> }
+                            </td>
+                            <td>@Rotulos.RotuloTipoVistoria(v.Tipo)</td>
+                            <td>@Rotulos.Data(v.DataVistoria)</td>
+                            <td>@(string.IsNullOrWhiteSpace(v.TecnicoResponsavel) ? "—" : v.TecnicoResponsavel)</td>
+                            <td>
+                                @if (v.EmAberto > 0) { @Html.Pilula($"{v.EmAberto} aberto(s)", new Estilo("#fbeedd", "#bd7d15")) }
+                                @if (v.Encerrados > 0) { @Html.Pilula($"{v.Encerrados} encerrado(s)", new Estilo("#e4f3ea", "#1f8a4c")) }
+                                @if (v.TotalApontamentos == 0) { <span class="cm-t-sub">sem apontamentos</span> }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <dialog class="cm-modal" id="modal-vistoria" aria-labelledby="titulo-modal-vist">
+        <form method="post" action="/certificacao/vistorias">
+            @Html.AntiForgeryToken()
+            <div class="cm-modal__cab">
+                <h2 class="cm-modal__titulo" id="titulo-modal-vist">Nova Vistoria</h2>
+                <button type="button" class="cm-icone-btn" data-fechar-modal aria-label="Fechar">@Html.Icone("close")</button>
+            </div>
+            <div class="cm-modal__corpo">
+                <span class="cm-rotulo">Tipo de vistoria</span>
+                <div class="cm-opcoes" style="margin-top:6px">
+                    @foreach (var (valor, rotulo) in Rotulos.TiposVistoria)
+                    {
+                        <input type="radio" id="tipo-@valor" name="Tipo" value="@valor" checked="@(valor == tipoSugerido)" />
+                        <label for="tipo-@valor">@rotulo</label>
+                    }
+                </div>
+                <div class="cm-linha">
+                    <div class="cm-campo"><label for="v-unid">Unidade / Propriedade *</label><input id="v-unid" class="cm-input" name="UnidadePropriedade" required placeholder="Ex: Fazenda Santa Rita" /></div>
+                    <div class="cm-campo"><label for="v-setor">Setor / Área</label><input id="v-setor" class="cm-input" name="SetorArea" placeholder="Ex: Talhão 4 — Secagem" /></div>
+                </div>
+                <div class="cm-linha">
+                    <div class="cm-campo"><label for="v-data">Data da vistoria *</label><input id="v-data" type="date" class="cm-input" name="DataVistoria" required value="@DateTime.Today.ToString("yyyy-MM-dd")" /></div>
+                    <div class="cm-campo"><label for="v-motivo">Motivo</label><input id="v-motivo" class="cm-input" name="Motivo" placeholder="Ex: Vistoria de rotina" /></div>
+                </div>
+                <div class="cm-linha">
+                    <div class="cm-campo"><label for="v-resp">Responsável pela vistoria</label><input id="v-resp" class="cm-input" name="TecnicoResponsavel" value="@UsuarioAtual.Nome(User)" /></div>
+                    <div class="cm-campo"><label for="v-cargo">Cargo</label><input id="v-cargo" class="cm-input" name="CargoTecnico" placeholder="Ex: Consultora Técnica" /></div>
+                </div>
+                <div class="cm-linha">
+                    <div class="cm-campo"><label for="v-aprov">Aprovado por</label><input id="v-aprov" class="cm-input" name="AprovadoPor" /></div>
+                    <div class="cm-campo"><label for="v-cargo-ap">Cargo do aprovador</label><input id="v-cargo-ap" class="cm-input" name="CargoAprovador" placeholder="Ex: Gerente de Certificação" /></div>
+                </div>
+            </div>
+            <div class="cm-modal__acoes">
+                <button type="button" class="cm-btn cm-btn--contorno" data-fechar-modal>Cancelar</button>
+                <button type="submit" class="cm-btn cm-btn--primario" data-carregando="Abrindo...">Abrir Vistoria</button>
+            </div>
+        </form>
+    </dialog>
+</div>
+<partial name="_Scripts" />

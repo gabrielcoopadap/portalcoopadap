@@ -1,0 +1,165 @@
+<div class="cm-topo">
+  <div>
+    <h1 class="cm-titulo"><span class="material-icons" aria-hidden="true">checklist</span> Requisitos</h1>
+    <p class="cm-subtitulo">Lista mestra consolidada — {{ conformes }} de {{ todos.length }} conformes ({{ filtrados.length }} exibidos)</p>
+  </div>
+  <div class="cm-acoes">
+    <div class="cm-dropdown" [class.is-aberto]="dropdown === 'baixar'">
+      <button type="button" class="cm-btn cm-btn--contorno" (click)="alternarDropdown('baixar', $event)"><span class="material-icons" aria-hidden="true">download</span> Baixar lista mestra <span class="material-icons" aria-hidden="true">arrow_drop_down</span></button>
+      <ul class="cm-dropdown__lista">
+        <li><a href="#" (click)="baixar(null, $event)">Todas as certificações</a></li>
+        <li *ngFor="let n of normas"><a href="#" (click)="baixar(n, $event)">{{ n }}</a></li>
+      </ul>
+    </div>
+    <div class="cm-dropdown" [class.is-aberto]="dropdown === 'normas'">
+      <button type="button" class="cm-btn cm-btn--contorno" title="Abre o site oficial da norma para conferir se saiu versão nova" (click)="alternarDropdown('normas', $event)"><span class="material-icons" aria-hidden="true">update</span> Verificar normas <span class="material-icons" aria-hidden="true">arrow_drop_down</span></button>
+      <ul class="cm-dropdown__lista">
+        <li *ngFor="let n of normasComSite"><a [href]="n.site" target="_blank" rel="noopener">{{ n.rotulo }}</a></li>
+      </ul>
+    </div>
+    <button type="button" class="cm-btn cm-btn--primario" (click)="novo()"><span class="material-icons" aria-hidden="true">add</span> Novo Requisito</button>
+  </div>
+</div>
+
+<form class="cm-card cm-filtros" [class.is-fechado]="filtrosFechados" (ngSubmit)="aplicarFiltros()">
+  <div class="cm-filtros__topo">
+    <span class="cm-filtros__rotulo">Filtros</span>
+    <button type="button" class="cm-filtros__alternar" (click)="filtrosFechados = !filtrosFechados"><span class="material-icons" aria-hidden="true">{{ filtrosFechados ? 'expand_more' : 'expand_less' }}</span><span class="rot">{{ filtrosFechados ? 'Mostrar filtros' : 'Esconder filtros' }}</span></button>
+  </div>
+  <div class="cm-filtros__corpo">
+    <div class="cm-campo" style="grid-column: span 2">
+      <label for="f-busca">Buscar</label>
+      <div class="cm-busca"><span class="material-icons" aria-hidden="true">search</span><input id="f-busca" class="cm-input" name="busca" [(ngModel)]="filtro.busca" placeholder="Requisito, descrição ou código da norma..." /></div>
+    </div>
+    <div class="cm-campo">
+      <label for="f-tema">Tema</label>
+      <select id="f-tema" class="cm-select" name="tema" [(ngModel)]="filtro.tema">
+        <option value="">Todos os temas</option>
+        <option *ngFor="let t of temas" [value]="t">{{ t }}</option>
+      </select>
+    </div>
+    <div class="cm-campo">
+      <label for="f-norma">Certificação</label>
+      <select id="f-norma" class="cm-select" name="norma" [(ngModel)]="filtro.norma">
+        <option value="">Todas as certificações</option>
+        <option *ngFor="let n of normas" [value]="n">{{ n }}</option>
+      </select>
+    </div>
+    <div class="cm-campo">
+      <label for="f-status">Status</label>
+      <select id="f-status" class="cm-select" name="status" [(ngModel)]="filtro.status">
+        <option value="">Todos os status</option>
+        <option *ngFor="let s of R.STATUS_REQUISITO" [value]="s">{{ s }}</option>
+      </select>
+    </div>
+    <div class="cm-campo">
+      <label for="f-prioridade">Prioridade</label>
+      <select id="f-prioridade" class="cm-select" name="prioridade" [(ngModel)]="filtro.prioridade">
+        <option value="">Todas as prioridades</option>
+        <option *ngFor="let p of R.PRIORIDADES" [value]="p">{{ p }}</option>
+      </select>
+    </div>
+    <div class="cm-filtros__botoes">
+      <a *ngIf="filtrosAtivos" class="cm-btn cm-btn--contorno" [routerLink]="'requisitos' | acRota">Limpar</a>
+      <button type="submit" class="cm-btn cm-btn--primario"><span class="material-icons" aria-hidden="true">filter_alt</span> Filtrar</button>
+    </div>
+  </div>
+</form>
+
+<ac-estado [carregando]="carregando" [erro]="erro" (tentarDeNovo)="carregar()"></ac-estado>
+
+<div *ngIf="!carregando && !erro" class="cm-card cm-tabela-wrap">
+  <div class="cm-tabela-scroll">
+    <table class="cm-tabela">
+      <thead>
+        <tr><th>Requisito</th><th>Tema</th><th>Referências (normas)</th><th>Prioridade</th><th>Status</th><th style="width:96px"></th></tr>
+      </thead>
+      <tbody>
+        <tr *ngIf="filtrados.length === 0"><td colspan="6" class="cm-tabela__vazio">Nenhum requisito encontrado.</td></tr>
+        <tr *ngFor="let r of filtrados" class="is-clicavel" tabindex="0" (click)="editar(r, $event)" (keydown.enter)="teclaLinha(r, $event)">
+          <td>
+            <div class="cm-t-titulo">{{ r.titulo }}</div>
+            <div *ngIf="r.observacao" class="cm-t-sub">{{ resumo(r.observacao) }}</div>
+          </td>
+          <td>{{ r.tema }}</td>
+          <td>
+            <ng-container *ngFor="let x of r.referencias"><span class="cm-tag" [title]="tituloTag(x)">{{ R.sigla(x.norma) }} {{ x.codigo }}</span>&ngsp;</ng-container>
+          </td>
+          <td><ac-pilula [texto]="maiusculas(r.prioridade)" [estilo]="R.estiloPrioridade(r.prioridade)"></ac-pilula></td>
+          <td><ac-pilula [texto]="r.status" [estilo]="R.estiloStatusRequisito(r.status)"></ac-pilula></td>
+          <td class="cm-req-acoes">
+            <button *ngIf="r.temGuia" type="button" class="cm-icone-btn cm-icone-btn--guia" title="Como cumprir este requisito" [attr.aria-label]="'Como cumprir: ' + (r.titulo ?? '')" (click)="abrirGuia(r)"><span class="material-icons" aria-hidden="true">menu_book</span></button>&ngsp;
+            <form ngNoForm (submit)="excluir(r, $event)">&ngsp;<button type="submit" class="cm-icone-btn" title="Excluir"><span class="material-icons" aria-hidden="true">delete_outline</span></button></form>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<ac-modal [aberto]="!!guia" titulo="Como cumprir" icone="menu_book" classe="cm-modal--guia" (fechar)="guia = null">
+  <button acoes-cabecalho type="button" class="cm-btn cm-btn--contorno cm-btn--pequeno" (click)="imprimirGuia()"><span class="material-icons" aria-hidden="true">print</span> Imprimir</button>
+  <div #corpoGuia class="cm-modal__corpo cm-guia" id="corpo-guia">
+    <ng-container *ngIf="guia as g">
+      <div class="cm-guia__topo">
+        <span class="cm-pilula" [style.background]="R.estiloPrioridade(g.prioridade).bg" [style.color]="R.estiloPrioridade(g.prioridade).cor">{{ maiusculas(g.prioridade) || '-' }}</span>&ngsp;
+        <ng-container *ngFor="let x of g.referencias"><span class="cm-tag" [title]="tituloTag(x)">{{ R.sigla(x.norma) }} {{ x.codigo }}</span>&ngsp;</ng-container>
+      </div>
+      <h3 class="cm-guia__titulo">{{ g.titulo }}</h3>
+      <section *ngIf="g.oQueE && g.oQueE.trim()" class="cm-guia__bloco"><h4><span class="material-icons" aria-hidden="true">help_outline</span> O que é</h4><p>{{ g.oQueE }}</p></section>
+      <section *ngIf="guiaPassos.length" class="cm-guia__bloco"><h4><span class="material-icons" aria-hidden="true">format_list_numbered</span> Passo a passo</h4><ol><li *ngFor="let x of guiaPassos">{{ x }}</li></ol></section>
+      <section *ngIf="guiaEvidencias.length" class="cm-guia__bloco"><h4><span class="material-icons" aria-hidden="true">folder_open</span> O que o auditor vai pedir</h4><ul class="cm-guia__check"><li *ngFor="let x of guiaEvidencias">{{ x }}</li></ul></section>
+      <section *ngIf="guiaAuto.length" class="cm-guia__bloco"><h4><span class="material-icons" aria-hidden="true">fact_check</span> Confira se está pronto</h4><ul class="cm-guia__perguntas"><li *ngFor="let x of guiaAuto">{{ x }}</li></ul></section>
+      <section *ngIf="guiaErros.length" class="cm-guia__bloco cm-guia__bloco--alerta"><h4><span class="material-icons" aria-hidden="true">warning_amber</span> Erros comuns</h4><ul><li *ngFor="let x of guiaErros">{{ x }}</li></ul></section>
+      <section *ngIf="guiaAjuda.length" class="cm-guia__bloco"><h4><span class="material-icons" aria-hidden="true">support_agent</span> Onde buscar ajuda</h4><ul><li *ngFor="let x of guiaAjuda">{{ x }}</li></ul></section>
+      <section *ngIf="g.observacao && g.observacao.trim()" class="cm-guia__bloco"><h4><span class="material-icons" aria-hidden="true">assignment</span> O que apresentar</h4><p>{{ g.observacao }}</p></section>
+    </ng-container>
+  </div>
+</ac-modal>
+
+<ac-modal [aberto]="formAberto" [titulo]="editandoId ? 'Editar Requisito' : 'Novo Requisito'" (fechar)="formAberto = false">
+  <form ngNativeValidate (ngSubmit)="salvar()">
+    <div class="cm-modal__corpo">
+      <div class="cm-campo"><label for="r-titulo">Título *</label><input id="r-titulo" class="cm-input" name="Titulo" required [(ngModel)]="f.titulo" /></div>
+      <div class="cm-campo"><label for="r-desc">Descrição</label><textarea id="r-desc" class="cm-textarea" name="Descricao" [(ngModel)]="f.descricao"></textarea></div>
+      <div class="cm-linha cm-linha--3">
+        <div class="cm-campo"><label for="r-tema">Tema</label><input id="r-tema" class="cm-input" name="Tema" list="lista-temas" [(ngModel)]="f.tema" /></div>
+        <div class="cm-campo"><label for="r-prio">Prioridade</label>
+          <select id="r-prio" class="cm-select" name="Prioridade" [(ngModel)]="f.prioridade">
+            <option *ngFor="let p of R.PRIORIDADES" [value]="p">{{ p }}</option>
+          </select>
+        </div>
+        <div class="cm-campo"><label for="r-status">Status</label>
+          <select id="r-status" class="cm-select" name="Status" [(ngModel)]="f.status">
+            <option *ngFor="let s of R.STATUS_REQUISITO" [value]="s">{{ s }}</option>
+          </select>
+        </div>
+      </div>
+      <datalist id="lista-temas"><option *ngFor="let t of temas" [value]="t"></option></datalist>
+
+      <span class="cm-rotulo">Referências às normas (de onde o requisito veio)</span>
+      <div class="cm-lista-edit" id="lista-referencias" style="margin-top:6px">
+        <div *ngFor="let x of f.referencias; let i = index" class="cm-lista-edit__linha">
+          <select class="cm-select" [name]="'Referencias[' + i + '].Norma'" [(ngModel)]="x.norma" aria-label="Norma">
+            <option *ngFor="let n of opcoesNorma(x.norma)" [value]="n">{{ n }}</option>
+          </select>
+          <input class="cm-input" [name]="'Referencias[' + i + '].Versao'" [(ngModel)]="x.versao" placeholder="versão" aria-label="Versão" />
+          <input class="cm-input" [name]="'Referencias[' + i + '].Codigo'" [(ngModel)]="x.codigo" placeholder="código (ex: 4.6.13)" aria-label="Código" />
+          <button type="button" class="cm-icone-btn" title="Remover" (click)="f.referencias.splice(i, 1)"><span class="material-icons" aria-hidden="true">close</span></button>
+        </div>
+      </div>
+      <button type="button" class="cm-btn cm-btn--texto cm-btn--pequeno" (click)="adicionarReferencia()"><span class="material-icons" aria-hidden="true">add</span> Referência</button>
+
+      <div class="cm-campo" style="margin-top:14px"><label for="r-obs">O que apresentar (conformidade)</label><textarea id="r-obs" class="cm-textarea" name="Observacao" [(ngModel)]="f.observacao"></textarea></div>
+      <div class="cm-linha cm-linha--3">
+        <div class="cm-campo"><label for="r-resp">Responsável</label><input id="r-resp" class="cm-input" name="Responsavel" [(ngModel)]="f.responsavel" /></div>
+        <div class="cm-campo"><label for="r-per">Periodicidade</label><input id="r-per" class="cm-input" name="Periodicidade" [(ngModel)]="f.periodicidade" placeholder="Ex: Anual" /></div>
+        <div class="cm-campo"><label for="r-prazo">Prazo</label><input id="r-prazo" type="date" class="cm-input" name="Prazo" [(ngModel)]="f.prazo" /></div>
+      </div>
+    </div>
+    <div class="cm-modal__acoes">
+      <button type="button" class="cm-btn cm-btn--contorno" (click)="formAberto = false">Cancelar</button>
+      <button type="submit" class="cm-btn cm-btn--primario" [class.is-carregando]="salvando" [disabled]="salvando">{{ salvando ? 'Salvando...' : 'Salvar' }}</button>
+    </div>
+  </form>
+</ac-modal>

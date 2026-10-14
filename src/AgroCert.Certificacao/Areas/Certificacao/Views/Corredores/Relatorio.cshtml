@@ -1,0 +1,37 @@
+@using AgroCert.Certificacao.Controllers.Telas
+@using Microsoft.AspNetCore.Hosting
+@model RelatorioCorredoresViewModel
+@inject IWebHostEnvironment Ambiente
+@{
+    Layout = null;
+    var logo = new[] { "logo-coopadap.svg", "logo-coopadap.png", "logo-coopadap.jpg" }
+        .FirstOrDefault(n => Ambiente.WebRootFileProvider.GetFileInfo("img/" + n).Exists);
+}
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Relatório de Corredores Ecológicos</title>
+    <link rel="stylesheet" href="~/_content/AgroCert.Certificacao/lib/material-icons/material-icons.css" />
+    <link rel="stylesheet" href="~/_content/AgroCert.Certificacao/lib/leaflet/leaflet.css" />
+    <link rel="stylesheet" href="~/_content/AgroCert.Certificacao/css/corredores-relatorio.css" asp-append-version="true" />
+</head>
+<body>
+    <div class="rl-barra">
+        <a class="rl-btn rl-btn--texto" href="/certificacao/corredores"><span class="material-icons">arrow_back</span> Voltar ao mapa</a>
+        <div class="rl-barra__meio" id="rl-opcoes"></div>
+        <button type="button" class="rl-btn" id="rl-imprimir" disabled><span class="material-icons">picture_as_pdf</span> Gerar PDF</button>
+    </div>
+    <p class="rl-dica" id="rl-dica">Carregando o relatório…</p>
+
+    <main id="rl-relatorio" class="rl-relatorio"
+          data-base="/certificacao/corredores/arquivo/"
+          data-regiao="@Model.Regiao" data-fazenda="@Model.Fazenda" data-veg="@Model.Vegetacao" data-dist="@Model.Distancia"
+          data-logo="@(logo is null ? "" : Url.Content("~/img/" + logo))">
+    </main>
+
+    <script src="~/_content/AgroCert.Certificacao/lib/leaflet/leaflet.js"></script>
+    <script src="~/_content/AgroCert.Certificacao/js/corredores-relatorio.js" asp-append-version="true"></script>
+</body>
+</html>

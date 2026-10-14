@@ -1,0 +1,178 @@
+@model EspeciesViewModel
+@using System.Text.Json
+@{
+    ViewData["Title"] = "Catálogo de espécies";
+    ViewData["MenuAtivo"] = "cert-fauna-flora";
+    var voltar = Context.Request.Path + Context.Request.QueryString;
+    var filtros = !string.IsNullOrEmpty(Model.Reino) || !string.IsNullOrEmpty(Model.Grupo) || !string.IsNullOrEmpty(Model.Busca) || !string.IsNullOrEmpty(Model.Status);
+    var gruposJson = JsonSerializer.Serialize(new { FAUNA = Biodiversidade.GruposFauna.Select(g => g.Nome), FLORA = Biodiversidade.GruposFlora.Select(g => g.Nome) });
+}
+<div class="cert-modulo">
+    <partial name="_Recursos" />
+    <a class="cm-voltar" href="/certificacao/fauna-flora">@Html.Icone("arrow_back") Fauna e Flora</a>
+
+    <div class="cm-topo">
+        <div>
+            <h1 class="cm-titulo">@Html.Icone("menu_book") Catálogo de espécies</h1>
+            <p class="cm-subtitulo">@Model.Especies.Count espécie(s) exibida(s) — fauna e flora registradas nas propriedades</p>
+        </div>
+        <div class="cm-acoes">
+            <button type="button" class="cm-btn cm-btn--contorno" data-abrir-modal="modal-registro">@Html.Icone("add_a_photo") Novo registro</button>
+            <button type="button" class="cm-btn cm-btn--primario" data-abrir-modal="modal-especie" data-novo>@Html.Icone("add") Nova espécie</button>
+        </div>
+    </div>
+
+    <form class="cm-card cm-filtros" method="get" action="/certificacao/fauna-flora/especies">
+        <div class="cm-filtros__topo">
+            <span class="cm-filtros__rotulo">Filtros</span>
+            <button type="button" class="cm-filtros__alternar" data-alternar-filtros>@Html.Icone("expand_less")<span class="rot">Esconder filtros</span></button>
+        </div>
+        <div class="cm-filtros__corpo">
+            <div class="cm-campo">
+                <label for="fe-busca">Buscar</label>
+                <div class="cm-busca">@Html.Icone("search")<input id="fe-busca" class="cm-input" name="busca" value="@Model.Busca" placeholder="Nome popular ou científico" /></div>
+            </div>
+            <div class="cm-campo">
+                <label for="fe-reino">Fauna / Flora</label>
+                <select id="fe-reino" class="cm-select" name="reino">
+                    <option value="">Todas</option>
+                    <option value="FAUNA" selected="@(Model.Reino == "FAUNA")">Fauna</option>
+                    <option value="FLORA" selected="@(Model.Reino == "FLORA")">Flora</option>
+                </select>
+            </div>
+            <div class="cm-campo">
+                <label for="fe-grupo">Grupo</label>
+                <select id="fe-grupo" class="cm-select" name="grupo">
+                    <option value="">Todos os grupos</option>
+                    @foreach (var g in Biodiversidade.GruposFauna.Concat(Biodiversidade.GruposFlora).Select(g => g.Nome).Distinct())
+                    {
+                        <option selected="@(g == Model.Grupo)">@g</option>
+                    }
+                </select>
+            </div>
+            <div class="cm-campo">
+                <label for="fe-status">Conservação</label>
+                <select id="fe-status" class="cm-select" name="status">
+                    <option value="">Todas</option>
+                    <option value="AMEACADA" selected="@(Model.Status == "AMEACADA")">Ameaçadas (VU, EN, CR)</option>
+                    @foreach (var (codigo, rotulo) in Biodiversidade.StatusConservacao) { <option value="@codigo" selected="@(Model.Status == codigo)">@rotulo</option> }
+                </select>
+            </div>
+            <div class="cm-filtros__botoes">
+                @if (filtros) { <a class="cm-btn cm-btn--contorno" href="/certificacao/fauna-flora/especies">Limpar</a> }
+                <button type="submit" class="cm-btn cm-btn--primario">@Html.Icone("filter_alt") Filtrar</button>
+            </div>
+        </div>
+    </form>
+
+    @if (Model.Especies.Count == 0)
+    {
+        <div class="cm-vazio">Nenhuma espécie encontrada.</div>
+    }
+    <div class="ff-catalogo">
+        @foreach (var e in Model.Especies)
+        {
+            var g = Biodiversidade.Grupo(e.Reino, e.Grupo);
+            var info = Model.Registros.GetValueOrDefault(e.Id);
+            var dados = JsonSerializer.Serialize(new
+            {
+                __acao = $"/certificacao/fauna-flora/especies/{e.Id}",
+                e.NomePopular, e.NomeCientifico, Reino = e.Reino.ToString(), e.Grupo, e.StatusConservacao, e.Descricao,
+            });
+            <article class="cm-card ff-especie" data-editar="@dados" data-modal="modal-especie" tabindex="0" title="Clique para editar">
+                @Html.Foto(e.FotoUrl, g, alt: e.NomePopular)
+                <div class="ff-especie__corpo">
+                    <div class="ff-especie__nome">@e.NomePopular</div>
+                    <div class="ff-especie__cient">@e.NomeCientifico</div>
+                    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:2px">
+                        @Html.Pilula($"{Biodiversidade.RotuloReino(e.Reino)} · {g.Nome}", new Estilo(HtmlExtensoes.CorSuave(g.Cor, "22"), "rgba(0,0,0,.75)"))
+                        @if (Biodiversidade.Ameacada(e.StatusConservacao))
+                        {
+                            @Html.Pilula(Biodiversidade.RotuloStatus(e.StatusConservacao), new Estilo("#fdeceb", "#c0392b"))
+                        }
+                        else if (e.StatusConservacao == "NT")
+                        {
+                            @Html.Pilula("Quase ameaçada", new Estilo("#fdf6da", "#8a6508"))
+                        }
+                    </div>
+                    <div class="ff-especie__rodape">
+                        <a href="/certificacao/fauna-flora/registros?especieId=@e.Id">@info.Total registro(s)</a>
+                        <span>@(info.Ultimo is DateTime u ? "último em " + u.ToString("dd/MM/yyyy") : "sem registros")</span>
+                    </div>
+                </div>
+            </article>
+        }
+    </div>
+
+    <dialog class="cm-modal" id="modal-especie" aria-labelledby="titulo-modal-esp">
+        <form method="post" action="/certificacao/fauna-flora/especies" data-acao-nova="/certificacao/fauna-flora/especies" enctype="multipart/form-data">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="voltarPara" value="@voltar" />
+            <div class="cm-modal__cab">
+                <h2 class="cm-modal__titulo" id="titulo-modal-esp" data-titulo-novo="Nova espécie" data-titulo-edicao="Editar espécie">Nova espécie</h2>
+                <button type="button" class="cm-icone-btn" data-fechar-modal aria-label="Fechar">@Html.Icone("close")</button>
+            </div>
+            <div class="cm-modal__corpo">
+                <div class="cm-linha">
+                    <div class="cm-campo"><label for="es-pop">Nome popular *</label><input id="es-pop" class="cm-input" name="NomePopular" required placeholder="Ex: Lobo-guará" /></div>
+                    <div class="cm-campo"><label for="es-cie">Nome científico</label><input id="es-cie" class="cm-input" name="NomeCientifico" placeholder="Ex: Chrysocyon brachyurus" style="font-style:italic" /></div>
+                </div>
+                <div class="cm-linha cm-linha--3">
+                    <div class="cm-campo">
+                        <label for="es-reino">Fauna / Flora *</label>
+                        <select id="es-reino" class="cm-select" name="Reino" data-padrao="FAUNA" data-grupos="@gruposJson">
+                            <option value="FAUNA">Fauna</option>
+                            <option value="FLORA">Flora</option>
+                        </select>
+                    </div>
+                    <div class="cm-campo">
+                        <label for="es-grupo">Grupo</label>
+                        <select id="es-grupo" class="cm-select" name="Grupo">
+                            @foreach (var g in Biodiversidade.GruposFauna) { <option>@g.Nome</option> }
+                        </select>
+                    </div>
+                    <div class="cm-campo">
+                        <label for="es-status">Conservação</label>
+                        <select id="es-status" class="cm-select" name="StatusConservacao" data-padrao="LC">
+                            @foreach (var (codigo, rotulo) in Biodiversidade.StatusConservacao) { <option value="@codigo">@rotulo (@codigo)</option> }
+                        </select>
+                    </div>
+                </div>
+                <div class="cm-campo"><label for="es-desc">Descrição</label><textarea id="es-desc" class="cm-textarea" name="Descricao" placeholder="Onde ocorre, hábitos, importância..."></textarea></div>
+                <div class="cm-campo"><label for="es-foto">Foto</label><input id="es-foto" type="file" accept="image/*" class="cm-input" name="Foto" /><span class="cm-ajuda">Use fotos próprias ou com licença de uso.</span></div>
+            </div>
+            <div class="cm-modal__acoes cm-modal__acoes--entre">
+                <button type="submit" class="cm-btn cm-btn--perigo" data-somente-edicao hidden data-excluir-especie formnovalidate>@Html.Icone("delete_outline") Excluir</button>
+                <div class="cm-acoes">
+                    <button type="button" class="cm-btn cm-btn--contorno" data-fechar-modal>Cancelar</button>
+                    <button type="submit" class="cm-btn cm-btn--primario" data-carregando="Salvando...">Salvar</button>
+                </div>
+            </div>
+        </form>
+    </dialog>
+
+    <partial name="_ModalRegistro" model="Model.Modal" />
+</div>
+<script>
+    (function () {
+        var reino = document.getElementById("es-reino"), grupo = document.getElementById("es-grupo");
+        var grupos = JSON.parse(reino.getAttribute("data-grupos"));
+        function montar(valor) {
+            grupo.innerHTML = "";
+            grupos[reino.value].forEach(function (g) { var o = document.createElement("option"); o.textContent = g; grupo.appendChild(o); });
+            if (valor) grupo.value = valor;
+        }
+        reino.addEventListener("change", function () { montar(); });
+        var excluir = document.querySelector("[data-excluir-especie]");
+        excluir.addEventListener("click", function (e) {
+            if (!window.confirm("Excluir esta espécie do catálogo?")) { e.preventDefault(); return; }
+            excluir.formAction = excluir.form.action.replace(/\/$/, "") + "/excluir";
+        });
+        document.addEventListener("click", function (e) {
+            var card = e.target.closest("[data-editar][data-modal=modal-especie]");
+            if (card) { var d = JSON.parse(card.getAttribute("data-editar")); reino.value = d.Reino; montar(d.Grupo); }
+            if (e.target.closest("[data-abrir-modal=modal-especie]")) setTimeout(function () { montar(); }, 0);
+        });
+    })();
+</script>
+<partial name="_Scripts" />

@@ -1,0 +1,4 @@
+{
+  "/api": { "target": "https://127.0.0.1:7180", "secure": false, "changeOrigin": true, "logLevel": "debug" },
+  "/uploads": { "target": "https://127.0.0.1:7180", "secure": false, "changeOrigin": true }
+}

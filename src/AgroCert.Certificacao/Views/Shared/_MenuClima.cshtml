@@ -1,0 +1,8 @@
+@{
+    var caminho = (Context.Request.Path.Value ?? "").TrimEnd('/').ToLowerInvariant();
+    var ativo = caminho == "/clima" || caminho.StartsWith("/clima/");
+}
+<a class="menu-item entry @(ativo ? "active-menu-item" : "")" href="/clima" aria-current="@(ativo ? "page" : null)">
+    <span class="material-icons" aria-hidden="true">thermostat</span>
+    <span class="menu-text menu-route-text">Clima e El Niño</span>
+</a>

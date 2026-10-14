@@ -1,0 +1,10 @@
+Coloque nesta pasta a camada de unidades de conservação usada no relatório de conformidade ambiental.
+
+Onde baixar:
+- CNUC / Ministério do Meio Ambiente (todas as UCs federais, estaduais e municipais): no portal de dados
+  abertos do MMA, procure "Unidades de Conservação" e baixe o shapefile (.zip). Pode deixar o .zip aqui.
+- IDE-Sisema (Minas Gerais): camadas "Unidades de Conservação" e, se houver, "Zonas de Amortecimento".
+
+Formatos aceitos: shapefile (.shp + .dbf + .prj, soltos ou dentro de .zip) e GeoJSON.
+Coordenadas em graus (SIRGAS 2000 ou WGS84). Arquivos com "amortec" no nome são tratados como zonas de amortecimento.
+Depois de colocar os arquivos, é só abrir o relatório de novo (não precisa reiniciar o portal).

@@ -1,0 +1,244 @@
+<section class="ff-hero">
+  <div class="ff-hero__id">
+    <span class="ff-hero__icone"><span class="material-icons" aria-hidden="true">forest</span></span>
+    <div>
+      <h1>Fauna e Flora</h1>
+      <p>Biodiversidade que protege o hoje e garante o amanhã.</p>
+    </div>
+  </div>
+  <div class="cm-acoes">
+    <a class="cm-btn cm-btn--contorno" [routerLink]="'fauna-flora/especies' | acRota"><span class="material-icons" aria-hidden="true">menu_book</span> Catálogo de espécies</a>
+    <a class="cm-btn cm-btn--contorno" [routerLink]="'fauna-flora/registros' | acRota"><span class="material-icons" aria-hidden="true">list_alt</span> Registros</a>
+    <button type="button" class="cm-btn ff-btn-claro" (click)="modalRegistro.abrir()"><span class="material-icons" aria-hidden="true">add_a_photo</span> Novo registro</button>
+  </div>
+</section>
+
+<ac-estado [carregando]="!dados && !erro" [erro]="erro" (tentarDeNovo)="carregar()"></ac-estado>
+
+<section class="ff-kpis" *ngIf="dados">
+  <div class="cm-card ff-kpi" *ngFor="let k of dados.indicadores">
+    <span class="ff-kpi__icone"><span class="material-icons" aria-hidden="true">{{ k.icone }}</span></span>
+    <div style="min-width:0">
+      <div class="ff-kpi__rotulo">{{ k.rotulo }}</div>
+      <div class="ff-kpi__valor">{{ k.valor }}</div>
+      <div class="ff-kpi__var">
+        <ng-container *ngIf="k.variacao !== null && k.variacao !== undefined; else semBase">
+          <b [class.is-queda]="k.variacao < 0"><span class="material-icons" aria-hidden="true">{{ k.variacao >= 0 ? 'arrow_upward' : 'arrow_downward' }}</span> {{ pctVar(k.variacao) }}%</b>
+          <span>&nbsp;{{ k.comparacao }}</span>
+        </ng-container>
+        <ng-template #semBase><span>{{ k.nota ?? 'sem base de comparação' }}</span></ng-template>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="ff-grade-topo" [hidden]="!dados">
+  <section class="cm-card ff-mapa-card">
+    <div class="ff-card__cab">
+      <div>
+        <h2><span class="material-icons" aria-hidden="true">map</span> Mapa de Biodiversidade</h2>
+        <p class="ff-sub" style="margin:2px 0 0 28px">Áreas de avistamento e registros de fauna e flora. Clique no mapa para registrar uma ocorrência.</p>
+      </div>
+    </div>
+    <div class="ff-mapa-corpo" style="margin-top:12px">
+      <div class="ff-filtros-mapa">
+        <div class="ff-abas" role="group" aria-label="Reino">
+          <button type="button" [class.is-ativa]="reinoAtivo === 'FAUNA'" [attr.aria-pressed]="reinoAtivo === 'FAUNA'" (click)="trocarReinoMapa('FAUNA')"><span class="material-icons" aria-hidden="true">pets</span> Fauna</button>
+          <button type="button" [class.is-ativa]="reinoAtivo === 'FLORA'" [attr.aria-pressed]="reinoAtivo === 'FLORA'" (click)="trocarReinoMapa('FLORA')"><span class="material-icons" aria-hidden="true">eco</span> Flora</button>
+        </div>
+        <label class="ff-switch"><input type="checkbox" [checked]="todosLigados" (change)="alternarTodos($any($event.target).checked)" /><span class="ff-trilho"></span><b style="font-family:var(--cm-fonte-media)">Todos</b></label>
+        <label class="ff-switch" *ngFor="let s of switches" [hidden]="s.reino !== reinoAtivo">
+          <input type="checkbox" [checked]="!desligados[s.chave]" (change)="alternarGrupo(s.chave, $any($event.target).checked)" />
+          <span class="ff-trilho"></span>
+          <span class="ff-ponto" [style.background]="s.g.cor"></span>{{ s.g.plural }}
+          <span class="ff-cont">{{ contagem[s.g.nome] || 0 }}</span>
+        </label>
+        <div class="ff-tit-filtro">Mostrar</div>
+        <select class="cm-select ff-select-mini" aria-label="O que mostrar no mapa" style="width:100%;margin-bottom:6px" [(ngModel)]="modo" (ngModelChange)="atualizarMapa()">
+          <option value="ultimo">Último registro de cada espécie</option>
+          <option value="todos">Todos os registros</option>
+        </select>
+        <div class="ff-tit-filtro">Período</div>
+        <select class="cm-select ff-select-mini" aria-label="Período dos registros no mapa" style="width:100%" [(ngModel)]="diasPeriodo" (ngModelChange)="atualizarMapa()">
+          <option [ngValue]="30">Últimos 30 dias</option>
+          <option [ngValue]="90">Últimos 90 dias</option>
+          <option [ngValue]="365">Últimos 12 meses</option>
+          <option [ngValue]="0">Todo o histórico</option>
+        </select>
+        <div class="ff-tit-filtro">Áreas</div>
+        <label class="cm-check" style="margin:4px 0"><input type="checkbox" [checked]="areasVisiveis.car" (change)="alternarArea('car', $any($event.target).checked)" /> Limite do CAR</label>
+        <label class="cm-check" style="margin:4px 0"><input type="checkbox" [checked]="areasVisiveis.rl" (change)="alternarArea('rl', $any($event.target).checked)" /> Reserva Legal</label>
+        <label class="cm-check" style="margin:4px 0"><input type="checkbox" [checked]="areasVisiveis.app" (change)="alternarArea('app', $any($event.target).checked)" /> APP (nascentes/margens)</label>
+        <p class="ff-legenda-mapa" *ngIf="dados && dados.propriedades.length === 0">Cadastre a propriedade em <a [routerLink]="'ambiental' | acRota">Ambiental</a> para ver as áreas.</p>
+      </div>
+      <div class="ff-mapa" #mapaEl role="region" aria-label="Mapa de biodiversidade"></div>
+    </div>
+  </section>
+
+  <div class="ff-coluna">
+    <section class="cm-card ff-card">
+      <div class="ff-card__cab">
+        <h2><span class="material-icons" aria-hidden="true">pets</span> Destaques de hoje</h2>
+        <a [routerLink]="'fauna-flora/registros' | acRota">Ver todos →</a>
+      </div>
+      <p class="cm-ajuda" *ngIf="destaquesHoje.length === 0">Nenhum registro ainda. Use "Novo registro".</p>
+      <div class="ff-destaques">
+        <article class="ff-destaque" *ngFor="let c of destaquesHoje">
+          <div acFfFoto [url]="c.foto" [grupo]="c.g" [alt]="c.r.especie"></div>
+          <div class="ff-destaque__corpo">
+            <ac-pilula [texto]="c.g.nome" [estilo]="c.pilula"></ac-pilula>
+            <div class="ff-destaque__nome" [title]="c.r.especie">{{ c.r.especie }}</div>
+            <div class="ff-destaque__meta">{{ c.meta }}<br />{{ c.quando }}</div>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section class="cm-card ff-card">
+      <div class="ff-card__cab">
+        <h2><span class="material-icons" aria-hidden="true">videocam</span> Câmeras de Monitoramento</h2>
+        <a [routerLink]="'fauna-flora/registros' | acRota" [queryParams]="{ origem: 'CAMERA' }">Ver todas →</a>
+      </div>
+      <p class="cm-ajuda" *ngIf="cameras.length === 0">Nenhum registro de câmera ainda.</p>
+      <div class="ff-carrossel" *ngIf="cameras.length > 0" aria-roledescription="carrossel" aria-label="Últimos registros das câmeras">
+        <div class="ff-slide" *ngFor="let c of cameras; let i = index" [class.is-ativo]="i === slide" role="group" aria-roledescription="slide">
+          <div class="ff-foto" *ngIf="c.foto; else semFoto"><img [src]="c.foto | acArquivo" [alt]="c.r.especie" loading="lazy" /></div>
+          <ng-template #semFoto><div class="ff-foto"><span class="material-icons" aria-hidden="true">{{ c.g.icone }}</span></div></ng-template>
+          <div class="ff-slide__topo"><span>{{ c.r.camera ?? 'Câmera' }}</span><span>{{ c.quando }}</span></div>
+          <div class="ff-slide__base">
+            <b>{{ c.r.especie }} {{ c.r.nomeCientifico === null ? '' : '(' + c.r.nomeCientifico + ')' }}</b>
+            <span class="ff-confirmado">{{ c.r.confirmado ? 'Registro confirmado' : 'Aguardando confirmação' }}</span>
+          </div>
+        </div>
+        <ng-container *ngIf="cameras.length > 1">
+          <button type="button" class="ff-seta ff-seta--esq" aria-label="Anterior" (click)="mostrarSlide(slide - 1)"><span class="material-icons" aria-hidden="true">chevron_left</span></button>
+          <button type="button" class="ff-seta ff-seta--dir" aria-label="Próximo" (click)="mostrarSlide(slide + 1)"><span class="material-icons" aria-hidden="true">chevron_right</span></button>
+          <span class="ff-contador-slide">{{ slide + 1 }} / {{ cameras.length }}</span>
+        </ng-container>
+      </div>
+    </section>
+  </div>
+</div>
+
+<div class="ff-grade-base" *ngIf="dados">
+  <section class="cm-card ff-card">
+    <div class="ff-card__cab">
+      <h2>Espécies em destaque</h2>
+      <a [routerLink]="'fauna-flora/especies' | acRota">Mais vistas →</a>
+    </div>
+    <div class="ff-mini-abas" role="tablist">
+      <button type="button" [class.is-ativa]="abaDestaque === 'fauna'" role="tab" [attr.aria-selected]="abaDestaque === 'fauna'" (click)="abaDestaque = 'fauna'">Fauna</button>
+      <button type="button" [class.is-ativa]="abaDestaque === 'flora'" role="tab" [attr.aria-selected]="abaDestaque === 'flora'" (click)="abaDestaque = 'flora'">Flora</button>
+    </div>
+    <div *ngFor="let p of paineisDestaque" [hidden]="p.chave !== abaDestaque">
+      <p class="cm-ajuda" *ngIf="p.lista.length === 0">Sem registros nos últimos 90 dias.</p>
+      <div class="ff-especies-grade">
+        <a class="ff-especie-mini" *ngFor="let d of p.lista" [routerLink]="'fauna-flora/registros' | acRota" [queryParams]="{ especieId: d.especie.id }" style="color:inherit;text-decoration:none">
+          <div acFfFoto [url]="d.fotoUrl" [grupo]="grupoDe(d)" [alt]="d.especie.nomePopular"></div>
+          <b>{{ d.especie.nomePopular }}</b>
+          <span>{{ d.registros }} registros</span>
+          <span *ngIf="d.variacao !== null && d.variacao !== undefined" [class]="d.variacao >= 0 ? 'ff-sobe' : 'ff-desce'">{{ d.variacao >= 0 ? '↑' : '↓' }} {{ pctVar(d.variacao) }}%</span>
+        </a>
+      </div>
+    </div>
+    <p class="ff-legenda-mapa">Últimos 90 dias, comparado aos 90 dias anteriores.</p>
+  </section>
+
+  <section class="cm-card ff-card">
+    <div class="ff-card__cab">
+      <h2>Evolução dos registros</h2>
+      <form (submit)="$event.preventDefault()">
+        <select class="cm-select ff-select-mini" name="meses" aria-label="Período do gráfico" [ngModel]="meses" (ngModelChange)="trocarMeses($event)">
+          <option [ngValue]="6">Últimos 6 meses</option>
+          <option [ngValue]="12">Últimos 12 meses</option>
+        </select>
+      </form>
+    </div>
+    <div class="ff-legenda">
+      <span><i [style.background]="corFauna"></i>Fauna</span>
+      <span><i [style.background]="corFlora"></i>Flora</span>
+    </div>
+    <svg class="ff-grafico" [attr.viewBox]="'0 0 ' + LW + ' ' + LH" role="img" aria-label="Registros por mês de fauna e flora">
+      <ng-container *ngFor="let t of graf.ticks">
+        <line [attr.x1]="graf.mEsq" [attr.x2]="graf.xFim" [attr.y1]="t.y" [attr.y2]="t.y" stroke="#ececec" stroke-width="1" />
+        <text [attr.x]="graf.xRotuloY" [attr.y]="t.yTexto" text-anchor="end">{{ t.v }}</text>
+      </ng-container>
+      <polygon [attr.points]="graf.areaFauna" [attr.fill]="corFauna" fill-opacity=".10" />
+      <polyline [attr.points]="graf.linhaFlora" fill="none" [attr.stroke]="corFlora" stroke-width="2" stroke-linejoin="round" />
+      <polyline [attr.points]="graf.linhaFauna" fill="none" [attr.stroke]="corFauna" stroke-width="2" stroke-linejoin="round" />
+      <ng-container *ngFor="let p of graf.pontos">
+        <circle [attr.cx]="p.x" [attr.cy]="p.yFlora" r="4" [attr.fill]="corFlora" stroke="#fff" stroke-width="2" />
+        <circle [attr.cx]="p.x" [attr.cy]="p.yFauna" r="4" [attr.fill]="corFauna" stroke="#fff" stroke-width="2" />
+        <text [attr.x]="p.x" [attr.y]="graf.yMes" text-anchor="middle">{{ p.mes }}</text>
+      </ng-container>
+      <ng-container *ngIf="graf.ultimo as u">
+        <text [attr.x]="u.x" [attr.y]="u.yFauna" style="fill:rgba(0,0,0,.8)">{{ u.fauna }}</text>
+        <text [attr.x]="u.x" [attr.y]="u.yFlora" style="fill:rgba(0,0,0,.8)">{{ u.flora }}</text>
+      </ng-container>
+      <g class="ff-hit" *ngFor="let p of graf.pontos" [acTip]="p.tip">
+        <line [attr.x1]="p.x" [attr.x2]="p.x" [attr.y1]="graf.mTopo" [attr.y2]="graf.yBase" stroke="rgba(0,0,0,.35)" stroke-width="1" />
+        <rect [attr.x]="p.xHit" y="0" [attr.width]="graf.larg" [attr.height]="graf.yBase" />
+      </g>
+    </svg>
+    <details class="ff-tabela-dados">
+      <summary>Ver dados</summary>
+      <table>
+        <tr><th>Mês</th><th>Fauna</th><th>Flora</th></tr>
+        <tr *ngFor="let p of dados.evolucao"><td>{{ mesAno(p.mes) }}</td><td>{{ p.fauna }}</td><td>{{ p.flora }}</td></tr>
+      </table>
+    </details>
+  </section>
+
+  <section class="cm-card ff-card">
+    <div class="ff-card__cab"><h2>Distribuição por grupo</h2></div>
+    <p class="ff-sub" style="margin-top:-6px">Espécies de fauna registradas</p>
+    <p class="cm-ajuda" *ngIf="fatias.length === 0 || totalFatias === 0">Sem registros de fauna ainda.</p>
+    <div class="ff-donut-linha" *ngIf="totalFatias > 0">
+      <svg class="ff-donut" viewBox="0 0 132 132" role="img" aria-label="Espécies de fauna por grupo">
+        <circle cx="66" cy="66" [attr.r]="raio" fill="none" stroke="#f0f0f0" stroke-width="18" />
+        <circle *ngFor="let f of fatias" class="ff-fatia" cx="66" cy="66" [attr.r]="raio" fill="none" [attr.stroke]="f.cor" stroke-width="18"
+                [attr.stroke-dasharray]="f.dash" [attr.stroke-dashoffset]="f.offset" transform="rotate(-90 66 66)" [acTip]="f.tip" />
+        <text x="66" y="64" text-anchor="middle" style="font-family:var(--cm-fonte-titulo);font-size:26px;fill:rgba(0,0,0,.87)">{{ dados.totalEspeciesFauna }}</text>
+        <text x="66" y="82" text-anchor="middle" style="font-size:11px;fill:rgba(0,0,0,.6)">espécies</text>
+      </svg>
+      <ul class="ff-donut-lista">
+        <li *ngFor="let f of dados.distribuicaoFauna"><i [style.background]="f.cor"></i>{{ f.grupo }}<b>{{ f.percentual }}%</b></li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="cm-card ff-card">
+    <div class="ff-card__cab"><h2>Explore e aprenda</h2></div>
+    <div class="ff-explore">
+      <a [routerLink]="'fauna-flora/especies' | acRota" [queryParams]="{ reino: 'FAUNA' }">
+        <div acFfFoto [grupo]="grupoExploreFauna"></div>
+        <span><b>Conheça nossa fauna</b><small>Saiba mais sobre as espécies que vivem em nossas áreas.</small></span>
+      </a>
+      <a [routerLink]="'fauna-flora/especies' | acRota" [queryParams]="{ reino: 'FLORA' }">
+        <div acFfFoto [grupo]="grupoExploreFlora"></div>
+        <span><b>Conheça nossa flora</b><small>Descubra as principais espécies nativas e sua importância.</small></span>
+      </a>
+      <a href="#" (click)="$event.preventDefault(); boasPraticas = true">
+        <div acFfFoto [grupo]="grupoExploreBoas"></div>
+        <span><b>Boas práticas ambientais</b><small>Como cada cooperado pode contribuir para a conservação.</small></span>
+      </a>
+    </div>
+  </section>
+</div>
+
+<ac-ff-modal-registro #modalRegistro [especies]="dados?.especies ?? []" [propriedades]="dados?.propriedades ?? []" (salvo)="carregar()"></ac-ff-modal-registro>
+
+<ac-modal [aberto]="boasPraticas" titulo="Boas práticas ambientais" (fechar)="boasPraticas = false">
+  <div class="cm-modal__corpo">
+    <ol class="ff-dicas">
+      <li><b>Conserve Reserva Legal e APP.</b> Mantenha cercadas as nascentes e margens de córregos e não use fogo nessas áreas.</li>
+      <li><b>Ligue os fragmentos.</b> Corredores de vegetação nativa entre matas permitem que os animais circulem com segurança.</li>
+      <li><b>Não cace, não capture e não alimente animais silvestres.</b> Oriente funcionários e visitantes — é exigência das certificações.</li>
+      <li><b>Registre o que vê.</b> Cada avistamento, vestígio ou foto de câmera vira evidência de biodiversidade para a auditoria.</li>
+      <li><b>Reduza a velocidade nas estradas internas</b> ao amanhecer e ao entardecer, quando os animais mais se deslocam.</li>
+      <li><b>Aplique agroquímicos com responsabilidade</b>, respeitando faixas de proteção de APP e corpos d'água.</li>
+      <li><b>Controle espécies invasoras</b> e prefira mudas nativas do Cerrado em recomposições.</li>
+    </ol>
+  </div>
+  <div class="cm-modal__acoes"><button type="button" class="cm-btn cm-btn--primario" (click)="boasPraticas = false">Entendi</button></div>
+</ac-modal>

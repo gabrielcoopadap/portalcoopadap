@@ -1,0 +1,39 @@
+<a class="cm-voltar" [routerLink]="'vistorias' | acRota"><span class="material-icons" aria-hidden="true">arrow_back</span> Vistorias</a>
+
+<div class="cm-topo">
+  <div>
+    <h1 class="cm-titulo"><span class="material-icons" aria-hidden="true">pending_actions</span> Pendências de Verificação em Campo</h1>
+    <p class="cm-subtitulo">Apontamentos em aberto de todas as vistorias, ordenados por prazo</p>
+  </div>
+</div>
+
+<ac-estado [carregando]="!lista && !erro" [erro]="erro" (tentarDeNovo)="carregar()"></ac-estado>
+
+<div *ngIf="lista" class="cm-card cm-tabela-wrap">
+  <div class="cm-tabela-scroll">
+    <table class="cm-tabela">
+      <thead><tr><th>Anomalia</th><th>Vistoria</th><th>Grau de risco</th><th>Prazo</th><th>Responsável</th></tr></thead>
+      <tbody>
+        <tr *ngIf="lista.length === 0"><td colspan="5" class="cm-tabela__vazio">Nenhuma pendência em aberto.</td></tr>
+        <tr *ngFor="let a of lista" class="is-clicavel" tabindex="0" (click)="aberto = a" (keydown.enter)="aberto = a">
+          <td>
+            <div class="cm-t-titulo">{{ a.anomalia }}</div>
+            <div *ngIf="a.localizacao?.trim()" class="cm-t-sub">{{ a.localizacao }}</div>
+          </td>
+          <td>{{ a.vistoriaCodigoDocumento }} — {{ a.vistoriaUnidade }}</td>
+          <td><ac-pilula [texto]="rotuloGrauRisco(a.grauRisco)" [estilo]="estiloGrauRisco(a.grauRisco)"></ac-pilula></td>
+          <td>
+            <div [class.cm-t-vermelho]="a.diasRestantes !== null && a.diasRestantes < 0">{{ a.prazo | acData }}</div>
+            <div *ngIf="a.diasRestantes !== null" class="cm-t-dias"
+                 [class.cm-t-vermelho]="a.diasRestantes < 0" [class.cm-t-ambar]="a.diasRestantes >= 0 && a.diasRestantes <= 7">
+              {{ a.diasRestantes < 0 ? abs(a.diasRestantes) + ' dia(s) atrasado' : a.diasRestantes + ' dia(s) restante(s)' }}
+            </div>
+          </td>
+          <td>{{ a.responsavelExecucao?.trim() ? a.responsavelExecucao : '—' }}</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<ac-modal-apontamento [a]="aberto" (fechar)="aberto = null" (alterado)="aberto = null; carregar()"></ac-modal-apontamento>

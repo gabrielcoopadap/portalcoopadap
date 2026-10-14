@@ -1,0 +1,78 @@
+@model ModalRegistroViewModel
+<dialog class="cm-modal" id="modal-registro" aria-labelledby="titulo-modal-registro">
+    <form method="post" action="/certificacao/fauna-flora/registros" enctype="multipart/form-data">
+        @Html.AntiForgeryToken()
+        <input type="hidden" name="voltarPara" value="@Model.Voltar" />
+        <div class="cm-modal__cab">
+            <h2 class="cm-modal__titulo" id="titulo-modal-registro">Novo registro de ocorrência</h2>
+            <button type="button" class="cm-icone-btn" data-fechar-modal aria-label="Fechar">@Html.Icone("close")</button>
+        </div>
+        <div class="cm-modal__corpo">
+            <div class="cm-linha">
+                <div class="cm-campo">
+                    <label for="rg-especie">Espécie *</label>
+                    <select id="rg-especie" class="cm-select" name="EspecieId" required>
+                        <option value="">Selecione</option>
+                        @foreach (var reino in new[] { Reino.FAUNA, Reino.FLORA })
+                        {
+                            <optgroup label="@Biodiversidade.RotuloReino(reino)">
+                                @foreach (var e in Model.Especies.Where(x => x.Reino == reino).OrderBy(x => x.NomePopular))
+                                {
+                                    <option value="@e.Id">@e.NomePopular@(e.NomeCientifico is null ? "" : $" ({e.NomeCientifico})")</option>
+                                }
+                            </optgroup>
+                        }
+                    </select>
+                    <a class="cm-ajuda" href="/certificacao/fauna-flora/especies">Não encontrou? Cadastre a espécie no catálogo</a>
+                </div>
+                <div class="cm-campo">
+                    <label for="rg-data">Data e hora *</label>
+                    <input id="rg-data" type="datetime-local" class="cm-input" name="DataHora" required value="@DateTime.Now.ToString("yyyy-MM-ddTHH:mm")" max="@DateTime.Now.AddMinutes(5).ToString("yyyy-MM-ddTHH:mm")" />
+                </div>
+            </div>
+
+            <span class="cm-rotulo">Como foi registrada</span>
+            <div class="cm-opcoes" style="margin-top:6px">
+                @foreach (var o in Enum.GetValues<OrigemRegistro>())
+                {
+                    <input type="radio" id="orig-@o" name="Origem" value="@o" checked="@(o == OrigemRegistro.AVISTAMENTO)" />
+                    <label for="orig-@o">@Biodiversidade.RotuloOrigem(o)</label>
+                }
+            </div>
+            <div class="cm-campo" data-mostrar-se="Origem=CAMERA" hidden>
+                <label for="rg-camera">Câmera</label>
+                <input id="rg-camera" class="cm-input" name="Camera" placeholder="Ex: Câmera 05 — Reserva Legal" />
+            </div>
+
+            <div class="cm-linha">
+                <div class="cm-campo">
+                    <label for="rg-area">Área</label>
+                    <select id="rg-area" class="cm-select" name="Area">
+                        @foreach (var a in Biodiversidade.Areas) { <option>@a</option> }
+                    </select>
+                </div>
+                <div class="cm-campo">
+                    <label for="rg-prop">Propriedade</label>
+                    <select id="rg-prop" class="cm-select" name="PropriedadeId">
+                        <option value="">—</option>
+                        @foreach (var p in Model.Propriedades) { <option value="@p.Id" selected="@(Model.Propriedades.Count == 1)">@p.Nome</option> }
+                    </select>
+                </div>
+            </div>
+            <div class="cm-linha cm-linha--3">
+                <div class="cm-campo"><label for="rg-lat">Latitude</label><input id="rg-lat" class="cm-input" name="Latitude" inputmode="decimal" placeholder="-19.205000" /></div>
+                <div class="cm-campo"><label for="rg-lon">Longitude</label><input id="rg-lon" class="cm-input" name="Longitude" inputmode="decimal" placeholder="-46.245000" /></div>
+                <div class="cm-campo"><label for="rg-qtd">Quantidade de indivíduos</label><input id="rg-qtd" type="number" min="1" class="cm-input" name="Quantidade" value="1" /></div>
+            </div>
+            <button type="button" class="cm-btn cm-btn--texto cm-btn--pequeno" data-minha-localizacao style="margin:-4px 0 10px">@Html.Icone("my_location") Usar minha localização</button>
+            <p class="cm-ajuda" style="margin-top:-6px">Dica: no painel, clique no ponto do mapa para preencher a localização.</p>
+
+            <div class="cm-campo"><label for="rg-foto">Foto</label><input id="rg-foto" type="file" accept="image/*" class="cm-input" name="Foto" /></div>
+            <div class="cm-campo"><label for="rg-obs">Observações</label><textarea id="rg-obs" class="cm-textarea" name="Observacao" placeholder="Comportamento, vestígios, estado da vegetação..."></textarea></div>
+        </div>
+        <div class="cm-modal__acoes">
+            <button type="button" class="cm-btn cm-btn--contorno" data-fechar-modal>Cancelar</button>
+            <button type="submit" class="cm-btn cm-btn--primario" data-carregando="Salvando...">Registrar</button>
+        </div>
+    </form>
+</dialog>

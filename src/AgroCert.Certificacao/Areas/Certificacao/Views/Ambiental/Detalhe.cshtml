@@ -1,0 +1,204 @@
+@model AmbientalDetalheViewModel
+@using System.Globalization
+@using System.Text.Json
+@{
+    var r = Model.Relatorio;
+    ViewData["Title"] = r.PropriedadeNome;
+    ViewData["MenuAtivo"] = "cert-ambiental";
+    var leituras = Model.Leituras;
+    var atual = Model.LeituraSelecionada;
+    var classe = Rotulos.ClassificarNdvi(atual?.NdviMedio);
+    decimal? variacao = atual?.NdviMedio != null && Model.LeituraAnterior?.NdviMedio != null ? atual.NdviMedio - Model.LeituraAnterior.NdviMedio : null;
+    string Mes(DateOnly d) => d.ToString("yyyy-MM");
+    var inv = CultureInfo.InvariantCulture;
+
+    var dadosMapa = JsonSerializer.Serialize(new
+    {
+        car = r.GeoJson,
+        reservaLegal = r.GeoJsonReservaLegal,
+        app = r.GeoJsonApp,
+        alertas = r.Alertas.Select(a => new
+        {
+            codigo = a.CodigoAlerta, area = Rotulos.Numero(a.AreaHa), data = Rotulos.Data(a.DataDeteccao), geoJson = a.GeoJson,
+            fonte = a.Fonte, classe = a.ClasseDesmatamento, status = Rotulos.RotuloStatusAlerta(a.Status),
+            antes = a.ImagemAntesUrl, depois = a.ImagemDepoisUrl,
+        }),
+        ndvi = atual?.ImagemMapaCalorUrl == null ? null : new
+        {
+            url = atual.ImagemMapaCalorUrl,
+            bbox = new[] { atual.BboxMinLon, atual.BboxMinLat, atual.BboxMaxLon, atual.BboxMaxLat },
+        },
+    });
+
+    const double L = 640, A = 170, mTopo = 12, mBase = 26, mEsq = 8, mDir = 8;
+    var areaA = A - mTopo - mBase;
+    var passo = leituras.Count > 1 ? (L - mEsq - mDir) / (leituras.Count - 1) : 0;
+    double Y(decimal? v) => mTopo + areaA * (1 - Math.Clamp((double)(v ?? 0), 0, 1));
+    double X(int i) => leituras.Count == 1 ? L / 2 : mEsq + passo * i;
+    var linha = string.Join(" ", leituras.Select((l, i) => $"{X(i).ToString("0.#", inv)},{Y(l.NdviMedio).ToString("0.#", inv)}"));
+    var camadas = new[] { ("limiteCar", "Limite do CAR", "#5e9a42"), ("reservaLegal", "Reserva Legal", "#2f7a54"), ("app", "APP", "#2f6fb2"), ("alertasDesmatamento", "Alertas de desmatamento", "#c0392b"), ("ndviMapaCalor", "Mapa de calor NDVI", "#d9a441") };
+}
+<link rel="stylesheet" href="~/_content/AgroCert.Certificacao/lib/leaflet/leaflet.css" />
+<div class="cert-modulo">
+    <partial name="_Recursos" />
+    <a class="cm-voltar" href="/certificacao/ambiental">@Html.Icone("arrow_back") Monitoramento Ambiental</a>
+
+    <div class="cm-topo">
+        <div>
+            <h1 class="cm-titulo">@Html.Icone("eco") @r.PropriedadeNome</h1>
+            <p class="cm-subtitulo">CAR: @r.CarCodigo</p>
+        </div>
+        <div class="cm-acoes">
+            <form method="post" action="/certificacao/ambiental/@r.PropriedadeId/sincronizar-alertas">
+                @Html.AntiForgeryToken()
+                <button type="submit" class="cm-btn cm-btn--contorno" data-carregando="Consultando MapBiomas...">@Html.Icone("travel_explore") Ver alertas</button>
+            </form>
+            <a class="cm-btn cm-btn--contorno" href="/certificacao/ambiental/@r.PropriedadeId/relatorio.pdf" title="Ficha resumida com os alertas">@Html.Icone("description") Ficha (PDF)</a>
+            <a class="cm-btn cm-btn--primario" href="/certificacao/ambiental/@r.PropriedadeId/conformidade" target="_blank" rel="noopener">@Html.Icone("fact_check") Relatório de conformidade</a>
+        </div>
+    </div>
+
+    <section class="cm-indicadores">
+        <div class="cm-card cm-indicador"><div class="cm-indicador__topo">Área do imóvel @Html.Icone("straighten", "color:#5e9a42")</div><div class="cm-indicador__valor">@(r.AreaHa.HasValue ? Rotulos.Numero(r.AreaHa) : "-") <small style="font-size:15px">ha</small></div></div>
+        <div class="cm-card cm-indicador"><div class="cm-indicador__topo">Área com alertas @Html.Icone("crop_free", "color:#c0392b")</div><div class="cm-indicador__valor">@Rotulos.Numero(r.AreaTotalAlertasHa) <small style="font-size:15px">ha</small></div></div>
+        <div class="cm-card cm-indicador"><div class="cm-indicador__topo">Alertas encontrados @Html.Icone("report_problem", "color:#c98a1a")</div><div class="cm-indicador__valor">@r.TotalAlertas</div><div class="cm-indicador__sub">Último: @Rotulos.Data(r.UltimoAlerta)</div></div>
+        <div class="cm-card cm-indicador"><div class="cm-indicador__topo">Situação @Html.Icone(r.TotalAlertas == 0 ? "verified" : "warning", r.TotalAlertas == 0 ? "color:#1f8a4c" : "color:#c0392b")</div><div class="cm-indicador__valor" style="font-size:16px;line-height:1.35">@r.Situacao</div></div>
+    </section>
+
+    <div class="cm-amb-corpo">
+        <div class="cm-card cm-camadas">
+            <b>Camadas</b>
+            <ul>
+                @foreach (var (chave, rotulo, cor) in camadas)
+                {
+                    <li><label><input type="checkbox" checked data-camada="@chave" /><span class="cm-cor" style="border-color:@cor;background:@(cor)33"></span>@rotulo</label></li>
+                }
+            </ul>
+            @if (string.IsNullOrWhiteSpace(r.GeoJson))
+            {
+                <p class="cm-ajuda">Propriedade sem geometria cadastrada.</p>
+            }
+        </div>
+        <div class="cm-mapa" id="cm-mapa" role="region" aria-label="Mapa da propriedade"></div>
+        <div class="cm-card cm-alerta-painel" id="cm-alerta-painel" hidden>
+            <div style="display:flex;justify-content:space-between;align-items:center"><b id="cm-alerta-titulo">Alerta</b><button type="button" class="cm-icone-btn" id="cm-alerta-fechar" aria-label="Fechar">@Html.Icone("close")</button></div>
+            <div id="cm-alerta-corpo"></div>
+        </div>
+    </div>
+
+    <section class="cm-card cm-card--pad cm-secao" id="ndvi">
+        <div class="cm-ndvi-cab">
+            <div style="flex:1;min-width:260px">
+                <h2 class="cm-card__titulo" style="margin-bottom:4px">@Html.Icone("grass") NDVI — Índice de Vegetação (Sentinel-2)</h2>
+                <p class="cm-ajuda" style="margin:0">
+                    Comparação temporal da cobertura vegetal dentro do polígono do CAR, calculada por satélite (Copernicus Data Space
+                    Ecosystem, gratuito). Clique num mês no gráfico ou na galeria para ver a imagem e o mapa de calor daquele período no mapa.
+                </p>
+            </div>
+            <form method="post" action="/certificacao/ambiental/@r.PropriedadeId/sincronizar-ndvi">
+                @Html.AntiForgeryToken()
+                <button type="submit" class="cm-btn cm-btn--contorno" data-carregando="Consultando Sentinel-2...">@Html.Icone("satellite_alt") Consultar NDVI</button>
+            </form>
+        </div>
+
+        @if (leituras.Count == 0)
+        {
+            <div class="cm-vazio" style="margin-top:14px">Nenhuma leitura de NDVI ainda. Clique em "Consultar NDVI" para calcular os últimos 12 meses a partir de imagens Sentinel-2.</div>
+        }
+        else
+        {
+            <div class="cm-ndvi-resumo">
+                <div class="cm-ndvi-resumo__valor" style="color:@classe.Cor">@(atual?.NdviMedio?.ToString("0.000", inv) ?? "-")</div>
+                <div>
+                    <div class="cm-ndvi-resumo__classe" style="color:@classe.Cor">@classe.Rotulo</div>
+                    <div class="cm-ndvi-resumo__meta">
+                        Referente a @(atual is null ? "-" : Rotulos.MesAno(atual.DataImagem))
+                        @if (variacao.HasValue)
+                        {
+                            <text> · @(variacao >= 0 ? "▲" : "▼") @Math.Abs(variacao.Value).ToString("0.000", inv) em relação ao mês anterior</text>
+                        }
+                        @if (atual?.PercentualAmostrasValidas < 40)
+                        {
+                            <text> · </text><span style="color:#b8860b">cobertura de nuvens alta neste mês — leitura pouco confiável</span>
+                        }
+                    </div>
+                </div>
+            </div>
+
+            <svg class="cm-ndvi-grafico" viewBox="0 0 @L.ToString(inv) @A.ToString(inv)" preserveAspectRatio="none" role="img" aria-label="Série mensal de NDVI">
+                @foreach (var refv in new[] { 0m, 0.2m, 0.5m, 0.8m, 1m })
+                {
+                    <line x1="@mEsq" x2="@((L - mDir).ToString(inv))" y1="@Y(refv).ToString("0.#", inv)" y2="@Y(refv).ToString("0.#", inv)" stroke="#e5e5e5" stroke-width="1" />
+                }
+                <polyline points="@linha" fill="none" stroke="#5e9a42" stroke-width="2.5" />
+                @for (var i = 0; i < leituras.Count; i++)
+                {
+                    var l = leituras[i];
+                    var sel = atual != null && l.Id == atual.Id;
+                    var cor = Rotulos.ClassificarNdvi(l.NdviMedio).Cor;
+                    <a href="?mes=@Mes(l.DataImagem)#ndvi" class="ponto">
+                        <circle cx="@X(i).ToString("0.#", inv)" cy="@Y(l.NdviMedio).ToString("0.#", inv)" r="@(sel ? "6.5" : "4")" fill="@cor" stroke="@(sel ? "#3e6e2a" : "#fff")" stroke-width="@(sel ? "2.5" : "1.5")">
+                            <title>@Rotulos.MesAno(l.DataImagem) — NDVI @(l.NdviMedio?.ToString("0.000", inv) ?? "-")</title>
+                        </circle>
+                        <text x="@X(i).ToString("0.#", inv)" y="@((A - 6).ToString(inv))" font-size="9.5" text-anchor="middle" fill="@(sel ? "#3e6e2a" : "#6f6a5f")" font-weight="@(sel ? "700" : "400")">@Rotulos.MesAno(l.DataImagem)</text>
+                    </a>
+                }
+            </svg>
+            <p class="cm-ndvi-legenda">
+                NDVI varia de 0 a 1: abaixo de 0,2 indica solo exposto ou água; de 0,2 a 0,5, vegetação esparsa ou estressada; acima
+                de 0,5, cobertura vegetal moderada a densa. Uma queda brusca entre leituras pode indicar desmatamento, colheita ou
+                estresse hídrico — vale conferir em campo.
+            </p>
+
+            <b style="font-size:14px">Imagens Sentinel-2 (cor real)</b>
+            @if (!leituras.Any(l => l.ImagemCorRealUrl != null))
+            {
+                <p class="cm-ajuda">Nenhuma imagem de satélite ainda. Clique em "Consultar NDVI" para baixar as imagens dos últimos meses.</p>
+            }
+            <div class="cm-galeria">
+                @foreach (var l in leituras.Where(l => l.ImagemCorRealUrl != null))
+                {
+                    <a href="?mes=@Mes(l.DataImagem)#ndvi" class="@(atual != null && l.Id == atual.Id ? "is-ativo" : "")" title="Ver @Rotulos.MesAno(l.DataImagem) no mapa">
+                        <img src="@l.ImagemCorRealUrl" alt="Sentinel-2 — @Rotulos.MesAno(l.DataImagem)" loading="lazy" />
+                        <span>@Rotulos.MesAno(l.DataImagem)</span>
+                    </a>
+                }
+            </div>
+        }
+    </section>
+
+    @{
+        var comImagem = r.Alertas.Where(a => a.ImagemAntesUrl != null || a.ImagemDepoisUrl != null).ToList();
+    }
+    @if (comImagem.Count > 0)
+    {
+        <section class="cm-card cm-card--pad cm-secao">
+            <h2 class="cm-card__titulo">@Html.Icone("history") Linha do Tempo de Imagens</h2>
+            <p class="cm-ajuda" style="margin-top:-6px">Imagens de antes/depois de cada alerta de desmatamento, organizadas por ano de detecção.</p>
+            @foreach (var grupo in comImagem.GroupBy(a => a.DataDeteccao?.Year.ToString() ?? "Sem data").OrderBy(g => g.Key))
+            {
+                <div class="cm-lt-ano">
+                    <div class="cm-lt-ano__rotulo">@grupo.Key</div>
+                    <div class="cm-lt-lista">
+                        @foreach (var a in grupo.OrderBy(a => a.DataDeteccao ?? DateOnly.MinValue))
+                        {
+                            <div class="cm-card cm-lt-item">
+                                <div class="cm-imagens">
+                                    @if (a.ImagemAntesUrl != null) { <figure><img src="@a.ImagemAntesUrl" alt="Antes" loading="lazy" /><figcaption>Antes</figcaption></figure> }
+                                    @if (a.ImagemDepoisUrl != null) { <figure><img src="@a.ImagemDepoisUrl" alt="Depois" loading="lazy" /><figcaption>Depois</figcaption></figure> }
+                                </div>
+                                <div class="cm-lt-meta"><span class="cm-codigo">@a.CodigoAlerta</span><span>@Rotulos.Data(a.DataDeteccao)</span>@if (a.AreaHa.HasValue) { <span>@Rotulos.Numero(a.AreaHa) ha</span> }</div>
+                            </div>
+                        }
+                    </div>
+                </div>
+            }
+        </section>
+    }
+
+    <p class="cm-aviso">@r.Aviso</p>
+</div>
+<script type="application/json" id="cm-dados-mapa">@Html.Raw(dadosMapa.Replace("</", "<\\/"))</script>
+<script src="~/_content/AgroCert.Certificacao/lib/leaflet/leaflet.js"></script>
+<script src="~/_content/AgroCert.Certificacao/js/ambiental-mapa.js" asp-append-version="true"></script>
+<partial name="_Scripts" />

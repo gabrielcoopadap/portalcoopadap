@@ -1,0 +1,106 @@
+<div class="rl-raiz">
+  <div class="rl-barra ac-nao-imprimir">
+<a class="rl-btn rl-btn--texto" [routerLink]="'corredores' | acRota"><span class="material-icons">arrow_back</span> Voltar ao mapa</a>
+<div class="rl-barra__meio">
+  <ng-container *ngIf="rel">
+    <label>Vegetação <select #selVeg (change)="trocarOpcoes(selVeg.value, selDist.value)">
+      <option *ngFor="let v of rel.d.vegetacoes" [value]="v.id" [selected]="v.id === p.veg">{{ v.nome }}</option>
+    </select></label>
+    <label>Distância <select #selDist (change)="trocarOpcoes(selVeg.value, selDist.value)">
+      <option *ngFor="let x of rel.d.distancias" [value]="x" [selected]="x === p.dist">{{ x }} m</option>
+    </select></label>
+  </ng-container>
+</div>
+<button type="button" class="rl-btn" [disabled]="!pronto" (click)="imprimir()"><span class="material-icons">picture_as_pdf</span> Gerar PDF</button>
+  </div>
+  <p class="rl-dica ac-nao-imprimir">
+<ng-container *ngIf="erro">Não foi possível montar o relatório desta fazenda. Volte ao mapa e tente de novo.</ng-container>
+<ng-container *ngIf="!erro && !pronto">Carregando o relatório…</ng-container>
+<ng-container *ngIf="!erro && pronto"><span class="material-icons" aria-hidden="true">info</span> Clique em <b>Gerar PDF</b> e, na janela de impressão, escolha <b>Salvar como PDF</b> (papel A4, retrato).</ng-container>
+  </p>
+
+  <main class="rl-relatorio ac-imprimir">
+<ng-container *ngIf="rel as m">
+  <section class="rl-pagina">
+    <header class="rl-cab">
+      <img *ngIf="!semLogo" class="rl-logo" src="img/logo-coopadap.png" alt="Coopadap" (error)="semLogo = true" />
+      <div *ngIf="semLogo" class="rl-logo-txt"><span class="material-icons" aria-hidden="true">spa</span> coopadap</div>
+      <div class="rl-cab__tit"><div class="rl-cab__h1">Relatório de Corredores Ecológicos</div><div class="rl-cab__sub">Certificação · emitido em {{ m.hoje }}</div></div>
+    </header>
+    <div class="rl-fazenda">
+      <div>
+        <div class="rl-fazenda__nome">{{ m.f.nome }}</div>
+        <div class="rl-fazenda__dados">{{ m.f.municipio }}/MG · {{ ha(m.f.areaHa) }} · CAR {{ m.f.car }}</div>
+      </div>
+      <div class="rl-param">{{ m.vegNome }} · travessia de até {{ p.dist }} m · MapBiomas {{ m.anoB }}</div>
+    </div>
+    <div class="rl-resumo">
+      <div class="rl-resumo__tit"><span class="material-icons" aria-hidden="true">eco</span> Em resumo</div>
+      <ul><li *ngFor="let x of m.frases" [innerHTML]="x"></li></ul>
+    </div>
+    <div class="rl-numeros">
+      <div class="rl-num" *ngFor="let n of m.numeros">
+        <div class="rl-num__v"><span *ngIf="n.sitHtml; else valor" [class]="'rl-sit rl-sit--' + m.sit[1]">{{ m.sit[0] }}</span><ng-template #valor>{{ n.v }}</ng-template></div>
+        <div class="rl-num__t">{{ n.t }}</div>
+        <div class="rl-num__s" *ngIf="n.s">{{ n.s }}</div>
+      </div>
+    </div>
+    <div class="rl-mapa" #mapa1></div>
+    <div class="rl-legenda">
+      <span class="rl-leg"><i class="rl-leg-cor" style="background:#2e9d57"></i>Corredores (cada cor é um)</span>
+      <span class="rl-leg"><i class="rl-leg-cor" [style.background]="m.d.paleta.isolado"></i>Fragmento isolado</span>
+      <span class="rl-leg"><i class="rl-leg-hach-app"></i>APP a recompor</span>
+      <span class="rl-leg"><i class="rl-leg-hach-rl"></i>RL sem vegetação</span>
+      <span class="rl-leg"><i class="rl-leg-limite"></i>Limite da fazenda</span>
+      <span class="rl-leg"><i class="rl-leg-rl"></i>Reserva Legal</span>
+      <span class="rl-leg"><i class="rl-leg-lig"></i>Trecho a restaurar (A, B, C)</span>
+    </div>
+  </section>
+
+  <section class="rl-pagina">
+    <h2 class="rl-h2"><span class="material-icons" aria-hidden="true">gavel</span> O que a lei já pede nesta fazenda</h2>
+    <table class="rl-tab"><tbody>
+      <tr *ngFor="let x of m.tabLei"><td>{{ x.a }}</td><td>{{ x.b }}</td></tr>
+      <tr class="rl-tab__total"><td>Total que a lei já pede recompor</td><td>{{ ha(m.lei) }}</td></tr>
+    </tbody></table>
+    <p class="rl-nota">A RL sem vegetação é estimada pelo mapa de satélite (30 m) e pode incluir áreas em regeneração ainda não vistas. Confirme em campo.</p>
+
+    <h2 class="rl-h2"><span class="material-icons" aria-hidden="true">link</span> Onde restaurar para ligar corredores</h2>
+    <ng-container *ngIf="m.ligs.length; else semLigacoes">
+      <table class="rl-tab rl-tab--lig">
+        <thead><tr><th></th><th>Onde</th><th>Falha sem {{ m.nomeVeg }}</th><th>Liga os corredores</th><th>Resultado</th><th>Já é obrigação legal?</th></tr></thead>
+        <tbody>
+          <tr *ngFor="let l of m.ligs; let i = index">
+            <td><span class="rl-letra" [class.rl-letra--lei]="l.leiPct >= 50">{{ letra(i) }}</span></td>
+            <td><b *ngIf="l.naFazenda">Dentro da fazenda</b><ng-container *ngIf="!l.naFazenda">Vizinhança (até 1,5 km)</ng-container></td>
+            <td><b>{{ num(l.distanciaM) }} m</b><div class="rl-sub">≈ {{ fmt1(l.distanciaM * 30 / 10000) }} ha numa faixa de 30 m · ~{{ num(l.distanciaM * 30 / 10000 * 1667) }} mudas</div></td>
+            <td>nº {{ l.de }} ({{ ha(l.deHa) }})<br />nº {{ l.para }} ({{ ha(l.paraHa) }})</td>
+            <td>um corredor de <b>{{ ha(l.juntosHa) }}</b></td>
+            <td><ng-container *ngIf="l.leiTipo && l.leiPct > 0; else nao"><b>{{ l.leiPct }}%</b> do trecho é {{ tipoLei(l) }}</ng-container><ng-template #nao>não</ng-template></td>
+          </tr>
+        </tbody>
+      </table>
+      <p class="rl-nota">Mudas estimadas no espaçamento 3 × 2 m (1.667 por hectare). A largura e o tipo de restauração (plantio, enriquecimento ou só cercar e deixar regenerar) devem ser definidos em campo.</p>
+    </ng-container>
+    <ng-template #semLigacoes>
+      <p class="rl-texto">Nenhum trecho curto (até {{ num(m.d.parametros.ligacaoMaxM) }} m) entre corredores passa pela fazenda ou fica a menos de 1,5 km dela{{ m.s.emCorredorHa > 0 ? '. A ' + m.nomeVeg + ' da fazenda já está ligada à rede de corredores.' : ' nesta combinação de vegetação e distância.' }}</p>
+    </ng-template>
+
+    <h2 class="rl-h2"><span class="material-icons" aria-hidden="true">history</span> Como a {{ m.nomeVeg }} mudou desde {{ m.anoA }}</h2>
+    <div class="rl-mudanca">
+      <div class="rl-mapa rl-mapa--p" #mapa2></div>
+      <div>
+        <table class="rl-tab"><tbody>
+          <tr *ngFor="let x of m.tabMudanca"><td><i *ngIf="x.corQ" class="rl-q" [style.background]="x.corQ"></i>{{ x.a }}</td><td>{{ x.b }}</td></tr>
+        </tbody></table>
+      </div>
+    </div>
+
+    <h2 class="rl-h2"><span class="material-icons" aria-hidden="true">menu_book</span> Como foi calculado</h2>
+    <p class="rl-texto rl-texto--p">Corredor ecológico é um conjunto de {{ p.veg === 'matas' ? 'matas' : 'áreas de vegetação nativa' }} encostadas ou separadas por até {{ p.dist }} m de área aberta, que os animais conseguem atravessar, com pelo menos {{ num(m.d.parametros.corredorMinHa) }} ha no total. Vegetação: MapBiomas ({{ m.d.anos.join(' e ') }}, pixels de 30 m). Limites, Reserva Legal e APP: CAR/SICAR. Trechos a restaurar são as menores falhas (até {{ num(m.d.parametros.ligacaoMaxM) }} m) entre dois corredores; ganham prioridade quando já são APP a recompor ou Reserva Legal sem vegetação. Os números são estimativas para planejamento e não substituem vistoria de campo.</p>
+    <div class="rl-assinaturas"><div>Responsável técnico</div><div>Produtor</div></div>
+    <div class="rl-rodape">Estudo gerado em {{ m.geradoEm }} · relatório emitido em {{ m.hoje }} · CAR {{ m.f.car }}</div>
+  </section>
+</ng-container>
+  </main>
+</div>
